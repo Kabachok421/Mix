@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { chatService } from '../services/chatService';
 import { UserProfile } from '../types';

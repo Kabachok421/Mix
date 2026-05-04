@@ -1,9 +1,29 @@
+import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { motion } from 'motion/react';
 import { LogIn, MessageSquare } from 'lucide-react';
 
 export default function Login() {
   const { login } = useAuth();
+  const [error, setError] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  const handleLogin = async () => {
+    setError(null);
+    setIsLoggingIn(true);
+    try {
+      await login();
+    } catch (err: any) {
+      console.error('Login error:', err);
+      if (err.code === 'auth/unauthorized-domain') {
+        setError('Этот домен не авторизован в Firebase. Добавьте его в Authorized Domains в консоли Firebase.');
+      } else {
+        setError(err.message || 'Произошла ошибка при входе. Проверьте консоль браузера.');
+      }
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#f5f5f0] dark:bg-[#0a0a0a] p-4 transition-colors duration-500">
@@ -20,11 +40,26 @@ export default function Login() {
         <h1 className="text-4xl font-serif font-light text-[#1a1a1a] dark:text-white mb-2">Mix</h1>
         <p className="text-[#5A5A40] dark:text-[#A0A080] font-light mb-8 italic">Связь в новом измерении</p>
         
+        {error && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-2xl text-xs text-red-600 dark:text-red-400"
+          >
+            {error}
+          </motion.div>
+        )}
+
         <button
-          onClick={login}
-          className="w-full flex items-center justify-center gap-3 bg-[#1a1a1a] text-white py-4 rounded-full font-medium hover:bg-[#333] transition-colors shadow-md group"
+          onClick={handleLogin}
+          disabled={isLoggingIn}
+          className="w-full flex items-center justify-center gap-3 bg-[#1a1a1a] dark:bg-white dark:text-black text-white py-4 rounded-full font-medium hover:bg-[#333] dark:hover:bg-gray-200 transition-colors shadow-md group disabled:opacity-50"
         >
-          <LogIn className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+          {isLoggingIn ? (
+             <div className="w-5 h-5 border-2 border-white dark:border-black border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <LogIn className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+          )}
           Войти через Google
         </button>
         
