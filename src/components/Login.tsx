@@ -17,6 +17,8 @@ export default function Login() {
       console.error('Login error:', err);
       if (err.code === 'auth/unauthorized-domain') {
         setError('Этот домен не авторизован в Firebase. Добавьте его в Authorized Domains в консоли Firebase.');
+      } else if (err.code === 'auth/network-request-failed') {
+        setError('Сетевая ошибка или блокировка. Если вы находитесь в режиме предпросмотра (iframe) или включена защита от отслеживания (Tracking Prevention), браузер мог заблокировать доступ к хранилищу. Пожалуйста, откройте приложение в новой вкладке (Open in new tab) или отключите блокировщики в браузере.');
       } else {
         setError(err.message || 'Произошла ошибка при входе. Проверьте консоль браузера.');
       }
