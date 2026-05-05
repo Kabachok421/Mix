@@ -56,7 +56,7 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
       if (onComplete) onComplete();
     } catch (err: any) {
       console.error(err);
-      setError('Не удалось сохранить профиль');
+      setError(`Не удалось сохранить профиль: ${err.message || 'неизвестная ошибка'}`);
     } finally {
       setSaving(false);
     }
