@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import UserProfileModal from './UserProfileModal';
 
 interface ChatWindowProps {
   chatId: string;
@@ -18,6 +19,7 @@ export default function ChatWindow({ chatId }: ChatWindowProps) {
   const [otherUser, setOtherUser] = useState<UserProfile | null>(null);
   const [isOtherTyping, setIsOtherTyping] = useState(false);
   const [input, setInput] = useState('');
+  const [showProfile, setShowProfile] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -95,12 +97,15 @@ export default function ChatWindow({ chatId }: ChatWindowProps) {
   return (
     <div className="flex-1 flex flex-col bg-white dark:bg-[#0d0d0d] overflow-hidden transition-colors duration-500">
       {/* Header */}
-      <div className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-[#222] bg-white/80 dark:bg-[#0d0d0d]/80 backdrop-blur-md z-10">
+      <div 
+        className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-[#222] bg-white/80 dark:bg-[#0d0d0d]/80 backdrop-blur-md z-10 cursor-pointer group"
+        onClick={() => { if (otherUser) setShowProfile(true); }}
+      >
         <div className="flex items-center gap-3">
           {otherUser?.photoURL ? (
-            <img src={otherUser.photoURL} alt="" className="w-10 h-10 rounded-full border border-gray-100 dark:border-[#333] shadow-sm" />
+            <img src={otherUser.photoURL} alt="" className="w-10 h-10 rounded-full border border-gray-100 dark:border-[#333] shadow-sm object-cover group-hover:opacity-80 transition-opacity" />
           ) : (
-            <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-[#1a1a1a] flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-[#1a1a1a] flex items-center justify-center group-hover:bg-gray-200 dark:group-hover:bg-[#222] transition-colors">
               <MessageSquare className="w-5 h-5 text-gray-500 dark:text-gray-400" />
             </div>
           )}
@@ -134,10 +139,19 @@ export default function ChatWindow({ chatId }: ChatWindowProps) {
             </AnimatePresence>
           </div>
         </div>
-        <button className="p-2 hover:bg-gray-100 dark:hover:bg-[#222] rounded-full transition-colors text-gray-400">
+        <button 
+          onClick={(e) => { e.stopPropagation(); /* any contextual menu action */ }}
+          className="p-2 hover:bg-gray-100 dark:hover:bg-[#222] rounded-full transition-colors text-gray-400"
+        >
           <MoreVertical className="w-5 h-5" />
         </button>
       </div>
+
+      <AnimatePresence>
+        {showProfile && otherUser && (
+          <UserProfileModal user={otherUser} onClose={() => setShowProfile(false)} />
+        )}
+      </AnimatePresence>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#fafafa] dark:bg-[#080808] custom-scrollbar">

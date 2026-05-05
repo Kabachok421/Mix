@@ -5,12 +5,13 @@ import Login from './components/Login';
 import ChatList from './components/ChatList';
 import ChatWindow from './components/ChatWindow';
 import UserSearch from './components/UserSearch';
+import SetupProfile from './components/SetupProfile';
 import { LogOut, MessageSquare, Settings, User as UserIcon, Moon, Sun, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 
 export default function App() {
-  const { user, loading, logout } = useAuth();
+  const { user, profile, loading, logout } = useAuth();
   const { darkMode, toggleDarkMode } = useTheme();
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -29,6 +30,14 @@ export default function App() {
 
   if (!user) {
     return <Login />;
+  }
+
+  if (profile && !profile.username) {
+    return (
+      <div className="h-screen flex bg-[#f5f5f0] dark:bg-[#050505] p-0 sm:p-4 transition-colors duration-500 font-sans">
+        <SetupProfile />
+      </div>
+    );
   }
 
   return (
@@ -58,15 +67,18 @@ export default function App() {
 
           {/* Profile Bar */}
           <div className="p-4 bg-gray-50/50 dark:bg-[#181818]/50 border-t border-gray-100 dark:border-[#222] mt-auto flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {user.photoURL ? (
-                <img src={user.photoURL} alt="" className="w-9 h-9 rounded-full border border-white dark:border-[#333] shadow-sm" />
+            <div 
+              className="flex items-center gap-3 cursor-pointer group"
+              onClick={() => setShowSettings(true)}
+            >
+              {profile?.photoURL ? (
+                <img src={profile.photoURL} alt="" className="w-9 h-9 border border-white dark:border-[#333] shadow-sm rounded-full object-cover group-hover:opacity-80 transition-opacity" />
               ) : (
-                <div className="w-9 h-9 rounded-full bg-gray-200 dark:bg-[#333] flex items-center justify-center text-gray-500 dark:text-gray-400"><UserIcon className="w-4 h-4" /></div>
+                <div className="w-9 h-9 rounded-full bg-gray-200 dark:bg-[#333] flex items-center justify-center text-gray-500 dark:text-gray-400 group-hover:bg-gray-300 dark:group-hover:bg-[#444] transition-colors"><UserIcon className="w-4 h-4" /></div>
               )}
               <div className="text-left overflow-hidden">
-                <p className="text-sm font-medium text-[#1a1a1a] dark:text-white truncate">{user.displayName}</p>
-                <p className="text-[10px] text-green-500 dark:text-green-400 uppercase tracking-tighter font-semibold">В сети</p>
+                <p className="text-sm font-medium text-[#1a1a1a] dark:text-white truncate">{profile?.displayName || user.displayName}</p>
+                <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate">@{profile?.username}</p>
               </div>
             </div>
             <button 
@@ -155,6 +167,11 @@ export default function App() {
                       className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm"
                     />
                   </button>
+                </div>
+
+                <div className="pt-4 border-t border-gray-100 dark:border-[#222]">
+                  <h4 className="text-sm font-medium mb-4 dark:text-white">Редактировать профиль</h4>
+                  <SetupProfile onComplete={() => setShowSettings(false)} fullPage={false} />
                 </div>
 
                 <div className="pt-4 border-t border-gray-100 dark:border-[#222]">

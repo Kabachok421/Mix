@@ -101,13 +101,13 @@ export const chatService = {
     }
   },
 
-  // Search users by email or name
+  // Search users by username
   searchUsers: async (searchTerm: string, currentUserId: string) => {
     try {
       const q = query(
         collection(db, 'users'),
-        where('email', '>=', searchTerm),
-        where('email', '<=', searchTerm + '\uf8ff'),
+        where('username', '>=', searchTerm),
+        where('username', '<=', searchTerm + '\uf8ff'),
         limit(10)
       );
       

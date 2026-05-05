@@ -35,6 +35,7 @@ service cloud.firestore {
         && data.email is string && data.email.size() < 256
         && data.displayName is string && data.displayName.size() < 100
         && (data.get('photoURL', '') is string)
+        && (data.get('username', '') is string) && (data.get('username', '').size() <= 30)
         && (data.get('status', 'offline') in ['online', 'offline']);
     }
 
@@ -61,7 +62,7 @@ service cloud.firestore {
       allow read: if isSignedIn(); // Allow discovery
       allow create: if isOwner(userId) && isValidUser(incoming());
       allow update: if isOwner(userId) && isValidUser(incoming())
-        && incoming().diff(existing()).affectedKeys().hasAny(['displayName', 'photoURL', 'lastSeen', 'status']);
+        && incoming().diff(existing()).affectedKeys().hasAny(['displayName', 'photoURL', 'lastSeen', 'status', 'username']);
     }
 
     match /chats/{chatId} {

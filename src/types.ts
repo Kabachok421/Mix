@@ -7,6 +7,7 @@ export interface UserProfile {
   photoURL: string;
   lastSeen: Timestamp;
   status: 'online' | 'offline';
+  username?: string;
 }
 
 export interface Chat {
