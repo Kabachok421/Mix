@@ -65,19 +65,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user) return;
     
+    // Fallback: don't spin forever if offline
+    const timeoutId = setTimeout(() => {
+       setLoading(false);
+    }, 5000);
+
     // Subscribe to profile changes
     const userRef = doc(db, 'users', user.uid);
     const unsubscribeProfile = onSnapshot(userRef, (doc) => {
       if (doc.exists()) {
         setProfile({ uid: doc.id, ...doc.data() } as UserProfile);
+      } else {
+        setProfile(null);
       }
-      setLoading(false); // only stop loading when profile is fetched
+      setLoading(false); // stop loading immediately when we get any data
+      clearTimeout(timeoutId);
     }, (error) => {
       console.error("Profile snapshot error:", error);
       setLoading(false);
+      clearTimeout(timeoutId);
     });
 
-    return () => unsubscribeProfile();
+    return () => {
+      unsubscribeProfile();
+      clearTimeout(timeoutId);
+    };
   }, [user]);
 
   const login = async () => {
