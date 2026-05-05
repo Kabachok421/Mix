@@ -17,9 +17,23 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
 
   const isUsernameLocked = (() => {
     if (!profile?.usernameUpdatedAt) return false;
-    const lastUpdate = profile.usernameUpdatedAt.toDate();
-    const hoursSinceUpdate = (new Date().getTime() - lastUpdate.getTime()) / (1000 * 60 * 60);
-    return hoursSinceUpdate < 24;
+    try {
+      let lastUpdate: Date;
+      const t = profile.usernameUpdatedAt as any;
+      if (typeof t.toDate === 'function') {
+        lastUpdate = t.toDate();
+      } else if (t.seconds) {
+        lastUpdate = new Date(t.seconds * 1000);
+      } else if (t instanceof Date) {
+        lastUpdate = t;
+      } else {
+        return false;
+      }
+      const hoursSinceUpdate = (new Date().getTime() - lastUpdate.getTime()) / (1000 * 60 * 60);
+      return hoursSinceUpdate < 24;
+    } catch {
+      return false;
+    }
   })();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -55,11 +69,25 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
     const isNewUsername = username.toLowerCase() !== profile?.username;
     
     if (isNewUsername && profile?.usernameUpdatedAt) {
-      const lastUpdate = profile.usernameUpdatedAt.toDate();
-      const hoursSinceUpdate = (new Date().getTime() - lastUpdate.getTime()) / (1000 * 60 * 60);
-      if (hoursSinceUpdate < 24) {
-        setError(`Менять никнейм можно только раз в 24 часа. Осталось ${Math.ceil(24 - hoursSinceUpdate)}ч.`);
-        return;
+      try {
+        let lastUpdate: Date;
+        const t = profile.usernameUpdatedAt as any;
+        if (typeof t.toDate === 'function') {
+          lastUpdate = t.toDate();
+        } else if (t.seconds) {
+          lastUpdate = new Date(t.seconds * 1000);
+        } else if (t instanceof Date) {
+          lastUpdate = t;
+        } else {
+          lastUpdate = new Date();
+        }
+        const hoursSinceUpdate = (new Date().getTime() - lastUpdate.getTime()) / (1000 * 60 * 60);
+        if (hoursSinceUpdate < 24) {
+          setError(`Менять никнейм можно только раз в 24 часа. Осталось ${Math.ceil(24 - hoursSinceUpdate)}ч.`);
+          return;
+        }
+      } catch {
+        // ignore
       }
     }
 
