@@ -36,6 +36,7 @@ service cloud.firestore {
         && data.displayName is string && data.displayName.size() < 100
         && (data.get('photoURL', '') == null || data.get('photoURL', '') is string)
         && (data.get('username', '') == null || data.get('username', '') is string)
+        && (data.get('usernameUpdatedAt', null) == null || data.get('usernameUpdatedAt', null) is timestamp)
         && (data.get('status', 'offline') in ['online', 'offline']);
     }
 
@@ -62,7 +63,17 @@ service cloud.firestore {
       allow read: if isSignedIn(); // Allow discovery
       allow create: if isOwner(userId) && isValidUser(incoming());
       allow update: if isOwner(userId) && isValidUser(incoming())
-        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'lastSeen', 'status', 'username', 'email']);
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'lastSeen', 'status', 'username', 'email', 'usernameUpdatedAt'])
+        && (
+          !('username' in incoming().diff(existing()).affectedKeys()) 
+          || (
+            incoming().usernameUpdatedAt == request.time 
+            && (
+              existing().get('usernameUpdatedAt', null) == null 
+              || existing().get('usernameUpdatedAt', null).toMillis() + (24 * 60 * 60 * 1000) <= request.time.toMillis()
+            )
+          )
+        );
     }
 
     match /chats/{chatId} {

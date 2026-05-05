@@ -8,6 +8,7 @@ export interface UserProfile {
   lastSeen: Timestamp;
   status: 'online' | 'offline';
   username?: string;
+  usernameUpdatedAt?: Timestamp;
 }
 
 export interface Chat {

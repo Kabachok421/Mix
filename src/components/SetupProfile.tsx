@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { motion } from 'motion/react';
 import { User, Camera, Save } from 'lucide-react';
@@ -13,6 +13,13 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
   const [saving, setSaving] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isUsernameLocked = (() => {
+    if (!profile?.usernameUpdatedAt) return false;
+    const lastUpdate = profile.usernameUpdatedAt.toDate();
+    const hoursSinceUpdate = (new Date().getTime() - lastUpdate.getTime()) / (1000 * 60 * 60);
+    return hoursSinceUpdate < 24;
+  })();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -44,15 +51,28 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
        return;
     }
 
+    const isNewUsername = username.toLowerCase() !== profile?.username;
+    
+    if (isNewUsername && profile?.usernameUpdatedAt) {
+      const lastUpdate = profile.usernameUpdatedAt.toDate();
+      const hoursSinceUpdate = (new Date().getTime() - lastUpdate.getTime()) / (1000 * 60 * 60);
+      if (hoursSinceUpdate < 24) {
+        setError(`Менять никнейм можно только раз в 24 часа. Осталось ${Math.ceil(24 - hoursSinceUpdate)}ч.`);
+        return;
+      }
+    }
+
     setSaving(true);
     setError('');
 
     try {
       const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        username: username.toLowerCase(),
-        photoURL
-      });
+      const dataToUpdate: any = { photoURL };
+      if (isNewUsername) {
+        dataToUpdate.username = username.toLowerCase();
+        dataToUpdate.usernameUpdatedAt = serverTimestamp();
+      }
+      await updateDoc(userRef, dataToUpdate);
       if (onComplete) onComplete();
     } catch (err: any) {
       console.error(err);
@@ -95,9 +115,11 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
               type="text" 
               value={username} 
               onChange={e => setUsername(e.target.value)}
-              className="w-full bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#333] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#5A5A40]/30 dark:focus:ring-[#A0A080]/30 transition-shadow dark:text-white"
+              disabled={isUsernameLocked}
+              className="w-full bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#333] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#5A5A40]/30 dark:focus:ring-[#A0A080]/30 transition-shadow dark:text-white disabled:opacity-50"
               placeholder="zxc_vasya"
             />
+            {isUsernameLocked && <p className="text-[10px] text-gray-400 mt-1">Изменение никнейма доступно 1 раз в 24 часа</p>}
           </div>
 
           {error && <p className="text-red-500 text-xs text-center">{error}</p>}
@@ -154,9 +176,11 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
               type="text" 
               value={username} 
               onChange={e => setUsername(e.target.value)}
-              className="w-full bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#333] rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#5A5A40]/30 dark:focus:ring-[#A0A080]/30 transition-shadow dark:text-white"
+              disabled={isUsernameLocked}
+              className="w-full bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#333] rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#5A5A40]/30 dark:focus:ring-[#A0A080]/30 transition-shadow dark:text-white disabled:opacity-50"
               placeholder="zxc_vasya"
             />
+            {isUsernameLocked && <p className="text-xs text-gray-400 mt-1">Изменение никнейма доступно 1 раз в 24 часа</p>}
           </div>
 
           {error && <p className="text-red-500 text-xs text-center">{error}</p>}
