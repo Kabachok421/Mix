@@ -21,19 +21,26 @@ export default function App() {
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#f5f5f0] dark:bg-[#0a0a0a] transition-colors duration-500">
-        <motion.div 
-          animate={{ rotate: 360 }}
-          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-          className="w-12 h-12 border-4 border-[#5A5A40] dark:border-[#A0A080] border-t-transparent rounded-full"
-        />
+        <div className="relative flex items-center justify-center">
+          <motion.div 
+            animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+            className="w-16 h-16 rounded-full bg-[#5A5A40]/20 dark:bg-[#A0A080]/20 blur-xl absolute"
+          />
+          <motion.div 
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            className="w-10 h-10 border-4 border-[#5A5A40]/20 dark:border-[#A0A080]/20 border-t-[#5A5A40] dark:border-t-[#A0A080] rounded-full relative z-10"
+          />
+          <MessageSquare className="w-4 h-4 text-[#5A5A40] dark:text-[#A0A080] absolute z-20" />
+        </div>
         {isOffline && (
           <motion.p 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            className="mt-6 text-sm text-gray-500 dark:text-gray-400 max-w-[200px] text-center"
+            initial={{ opacity: 0, y: 5 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            className="mt-6 text-sm text-[#5A5A40] dark:text-[#A0A080] max-w-[200px] text-center font-medium"
           >
-            Подключение к серверу...<br/>
-            (Ожидание ответа сети)
+            Подключение к серверу...
           </motion.p>
         )}
       </div>

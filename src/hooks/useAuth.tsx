@@ -21,10 +21,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
 
-  // Global fallback to show offline warning
+  // Global fallback to show offline warning and prevent absolute hang
   useEffect(() => {
     const fallbackTimeoutId = setTimeout(() => {
-      if (loading) setIsOffline(true);
+      if (loading) {
+        setIsOffline(true);
+        // Force stop loading after a longer delay so user is not stuck forever
+        setTimeout(() => setLoading(false), 3000);
+      }
     }, 4000); 
     return () => clearTimeout(fallbackTimeoutId);
   }, [loading]);
