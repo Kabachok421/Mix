@@ -1,6 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap');
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Cormorant Garamond", serif;
@@ -18,5 +20,50 @@
   }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     @apply bg-gray-300 dark:bg-gray-700;
+  }
+}
+
+/* 
+  Ocean Theme Overrides
+  Translates hardcoded dark mode hex colors to ocean neon colors
+*/
+@layer base {
+  .ocean {
+    /* Base backgrounds */
+    & :where(.dark\:bg-\[\#0a0a0a\], .dark\:bg-\[\#050505\], .dark\:bg-\[\#080808\], .dark\:bg-\[\#0d0d0d\]) {
+      background-color: #010f17 !important;
+    }
+    
+    /* Panels / Cards */
+    & :where(.dark\:bg-\[\#111111\], .dark\:bg-\[\#141414\], .dark\:bg-\[\#181818\], .dark\:bg-\[\#1a1a1a\], .dark\:bg-\[\#1e1e1e\]) {
+      background-color: #041f2e !important;
+    }
+    
+    /* Elements / Controls */
+    & :where(.dark\:bg-\[\#222\], .dark\:bg-\[\#333\], .dark\:bg-\[\#444\]) {
+      background-color: #0b344a !important;
+      box-shadow: 0 0 15px rgba(0, 204, 255, 0.1) inset;
+    }
+    
+    /* Borders */
+    & :where(.dark\:border-\[\#222\], .dark\:border-\[\#333\], .dark\:border-\[\#444\]) {
+      border-color: #0b496b !important;
+    }
+    
+    /* Shadows & Effects */
+    & :where(.dark\:shadow-\[0_20px_60px_rgba\(0\,0\,0\,0\.6\)\]) {
+      box-shadow: 0 0 40px rgba(0, 150, 255, 0.1), 0 20px 60px rgba(0,0,0,0.6) !important;
+    }
+    
+    /* Neon Texts */
+    & :where(.dark\:text-\[\#A0A080\]) {
+      color: #00ffff !important;
+      text-shadow: 0 0 8px rgba(0, 255, 255, 0.4);
+    }
+    
+    /* Accents */
+    & :where(.dark\:focus-within\:ring-\[\#A0A080\]\/30) {
+      --tw-ring-color: rgba(0, 255, 255, 0.3) !important;
+    }
   }
 }

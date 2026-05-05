@@ -12,7 +12,7 @@ import { cn } from './lib/utils';
 
 export default function App() {
   const { user, profile, loading, logout } = useAuth();
-  const { darkMode, toggleDarkMode } = useTheme();
+  const { theme, setTheme } = useTheme();
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
 
@@ -145,28 +145,42 @@ export default function App() {
                 </button>
               </div>
               <div className="p-6 space-y-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-[#222] flex items-center justify-center">
-                      {darkMode ? <Moon className="w-5 h-5 dark:text-blue-400" /> : <Sun className="w-5 h-5 text-orange-400" />}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium dark:text-white">Тёмная тема</p>
-                      <p className="text-xs text-gray-400">Переключить интерфейс</p>
-                    </div>
+                <div className="space-y-4">
+                  <h4 className="text-sm font-medium mb-2 dark:text-white">Тема оформления</h4>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button 
+                      onClick={() => setTheme('light')}
+                      className={cn(
+                        "flex flex-col items-center justify-center p-3 rounded-xl border transition-all",
+                        theme === 'light' ? "border-[#5A5A40] bg-gray-50" : "border-gray-200 hover:bg-gray-50 dark:border-[#333] dark:hover:bg-[#1a1a1a]"
+                      )}
+                    >
+                      <Sun className="w-5 h-5 mb-2 text-orange-500" />
+                      <span className="text-xs font-medium dark:text-gray-300">Светлая</span>
+                    </button>
+                    
+                    <button 
+                      onClick={() => setTheme('dark')}
+                      className={cn(
+                        "flex flex-col items-center justify-center p-3 rounded-xl border transition-all",
+                        theme === 'dark' ? "border-gray-400 bg-gray-800 text-white" : "border-gray-200 dark:border-[#333] hover:bg-gray-100 dark:hover:bg-[#1a1a1a]"
+                      )}
+                    >
+                      <Moon className="w-5 h-5 mb-2 text-blue-400" />
+                      <span className="text-xs font-medium dark:text-gray-300">Тёмная</span>
+                    </button>
+                    
+                    <button 
+                      onClick={() => setTheme('ocean')}
+                      className={cn(
+                        "flex flex-col items-center justify-center p-3 rounded-xl border transition-all",
+                        theme === 'ocean' ? "border-cyan-400 bg-[#041f2e] text-white shadow-[0_0_10px_rgba(0,255,255,0.2)]" : "border-gray-200 dark:border-[#333] hover:bg-gray-100 dark:hover:bg-[#1a1a1a]"
+                      )}
+                    >
+                      <div className="w-5 h-5 mb-2 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 shadow-[0_0_8px_rgba(0,255,255,0.5)]" />
+                      <span className="text-xs font-medium dark:text-gray-300">Ocean</span>
+                    </button>
                   </div>
-                  <button 
-                    onClick={toggleDarkMode}
-                    className={cn(
-                      "w-12 h-6 rounded-full transition-all relative",
-                      darkMode ? "bg-blue-600" : "bg-gray-200"
-                    )}
-                  >
-                    <motion.div 
-                      animate={{ x: darkMode ? 24 : 4 }}
-                      className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm"
-                    />
-                  </button>
                 </div>
 
                 <div className="pt-4 border-t border-gray-100 dark:border-[#222]">
