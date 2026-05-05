@@ -32,7 +32,7 @@ export default function App() {
     return <Login />;
   }
 
-  if (profile && !profile.username) {
+  if (!profile || !profile.username) {
     return (
       <div className="h-screen flex bg-[#f5f5f0] dark:bg-[#050505] p-0 sm:p-4 transition-colors duration-500 font-sans">
         <SetupProfile />

@@ -19,6 +19,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Global fallback to ensure app doesn't hang infinitely if something blocks firebase init
+  useEffect(() => {
+    const fallbackTimeoutId = setTimeout(() => {
+      setLoading(false);
+    }, 4000); // 4s absolute max loader time
+    return () => clearTimeout(fallbackTimeoutId);
+  }, []);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -68,7 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Fallback: don't spin forever if offline
     const timeoutId = setTimeout(() => {
        setLoading(false);
-    }, 5000);
+    }, 2000);
 
     // Subscribe to profile changes
     const userRef = doc(db, 'users', user.uid);
@@ -90,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       unsubscribeProfile();
       clearTimeout(timeoutId);
     };
-  }, [user]);
+  }, [user?.uid]);
 
   const login = async () => {
     try {
