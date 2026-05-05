@@ -24,25 +24,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (user) {
         setUser(user);
         
-        // Sync minimal user details if not exists
-        const userRef = doc(db, 'users', user.uid);
-        const docSnap = await getDoc(userRef);
-        
-        if (!docSnap.exists()) {
-           await setDoc(userRef, {
-            uid: user.uid,
-            email: user.email,
-            displayName: user.displayName || 'Anonymous',
-            photoURL: user.photoURL || '',
-            lastSeen: serverTimestamp(),
-            status: 'online',
-            username: ''
-          });
-        } else {
-           await setDoc(userRef, {
-             lastSeen: serverTimestamp(),
-             status: 'online'
-           }, { merge: true });
+        try {
+          // Sync minimal user details if not exists
+          const userRef = doc(db, 'users', user.uid);
+          const docSnap = await getDoc(userRef);
+          
+          if (!docSnap.exists()) {
+             await setDoc(userRef, {
+              uid: user.uid,
+              email: user.email,
+              displayName: user.displayName || 'Anonymous',
+              photoURL: user.photoURL || '',
+              lastSeen: serverTimestamp(),
+              status: 'online',
+              username: ''
+            });
+          } else {
+             await setDoc(userRef, {
+               lastSeen: serverTimestamp(),
+               status: 'online'
+             }, { merge: true });
+          }
+        } catch (error: any) {
+             console.error("Firestore error in useAuth:", error);
+             if (error?.message?.includes('offline') || error?.code === 'unavailable') {
+                 // Do not break the app completely if possible, but inform
+                 console.warn("User is offline or browser blocked connection.");
+             }
         }
       } else {
         setUser(null);
@@ -64,6 +72,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile({ uid: doc.id, ...doc.data() } as UserProfile);
       }
       setLoading(false); // only stop loading when profile is fetched
+    }, (error) => {
+      console.error("Profile snapshot error:", error);
+      setLoading(false);
     });
 
     return () => unsubscribeProfile();
