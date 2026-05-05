@@ -4,6 +4,7 @@ import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { motion } from 'motion/react';
 import { User, Camera, Save } from 'lucide-react';
+import { Avatar } from './Avatar';
 
 export default function SetupProfile({ onComplete, fullPage = true }: { onComplete?: () => void, fullPage?: boolean }) {
   const { user, profile } = useAuth();
@@ -90,11 +91,7 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
               className="w-20 h-20 rounded-full bg-gray-100 dark:bg-[#222] border-2 border-dashed border-gray-300 dark:border-gray-700 flex items-center justify-center cursor-pointer relative overflow-hidden group"
               onClick={() => fileInputRef.current?.click()}
             >
-              {photoURL ? (
-                <img src={photoURL} alt="Avatar" className="w-full h-full object-cover" />
-              ) : (
-                <User className="w-8 h-8 text-gray-400" />
-              )}
+              <Avatar src={photoURL} className="w-full h-full" />
               <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                 <Camera className="w-5 h-5 text-white" />
               </div>
@@ -151,11 +148,7 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
               className="w-24 h-24 rounded-full bg-gray-100 dark:bg-[#222] border-2 border-dashed border-gray-300 dark:border-gray-700 flex items-center justify-center cursor-pointer relative overflow-hidden group"
               onClick={() => fileInputRef.current?.click()}
             >
-              {photoURL ? (
-                <img src={photoURL} alt="Avatar" className="w-full h-full object-cover" />
-              ) : (
-                <User className="w-10 h-10 text-gray-400" />
-              )}
+              <Avatar src={photoURL} className="w-full h-full" />
               <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                 <Camera className="w-6 h-6 text-white" />
               </div>

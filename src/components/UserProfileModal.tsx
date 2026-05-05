@@ -4,6 +4,7 @@ import { UserProfile } from '../types';
 import { X, User, Mail, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import { Avatar } from './Avatar';
 
 interface UserProfileModalProps {
   user: UserProfile;
@@ -44,11 +45,7 @@ export default function UserProfileModal({ user, onClose }: UserProfileModalProp
           
           <div className="absolute -bottom-12 left-6">
             <div className="w-24 h-24 rounded-full border-4 border-white dark:border-[#1a1a1a] bg-gray-200 dark:bg-[#333] flex items-center justify-center overflow-hidden shadow-lg">
-              {user.photoURL ? (
-                <img src={user.photoURL} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <User className="w-10 h-10 text-gray-500" />
-              )}
+              <Avatar src={user.photoURL} className="w-full h-full" />
             </div>
           </div>
         </div>

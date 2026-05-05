@@ -12,6 +12,8 @@ interface ChatListProps {
   activeChatId: string | null;
 }
 
+import { Avatar } from './Avatar';
+
 export default function ChatList({ onSelectChat, activeChatId }: ChatListProps) {
   const { user } = useAuth();
   const [chats, setChats] = useState<Chat[]>([]);
@@ -60,17 +62,10 @@ export default function ChatList({ onSelectChat, activeChatId }: ChatListProps) 
                 )}
               >
                 <div className="relative">
-                  {otherUser?.photoURL ? (
-                    <img 
-                      src={otherUser.photoURL} 
-                      alt={otherUser.displayName} 
-                      className="w-12 h-12 rounded-full border border-gray-200 dark:border-[#333]"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-[#333] flex items-center justify-center text-gray-500 dark:text-gray-400 font-medium">
-                      {otherUser?.displayName?.charAt(0) || '?'}
-                    </div>
-                  )}
+                  <Avatar 
+                    src={otherUser?.photoURL} 
+                    className="w-12 h-12" 
+                  />
                   {otherUser?.status === 'online' && (
                     <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-[#1a1a1a] rounded-full" />
                   )}

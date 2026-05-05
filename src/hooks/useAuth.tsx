@@ -8,6 +8,7 @@ interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
+  isOffline: boolean;
   login: () => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -18,14 +19,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isOffline, setIsOffline] = useState(false);
 
-  // Global fallback to ensure app doesn't hang infinitely if something blocks firebase init
+  // Global fallback to show offline warning
   useEffect(() => {
     const fallbackTimeoutId = setTimeout(() => {
-      setLoading(false);
-    }, 4000); // 4s absolute max loader time
+      if (loading) setIsOffline(true);
+    }, 4000); 
     return () => clearTimeout(fallbackTimeoutId);
-  }, []);
+  }, [loading]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -35,30 +37,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           // Sync minimal user details if not exists
           const userRef = doc(db, 'users', user.uid);
-          const docSnap = await getDoc(userRef);
-          
-          if (!docSnap.exists()) {
-             await setDoc(userRef, {
-              uid: user.uid,
-              email: user.email,
-              displayName: user.displayName || 'Anonymous',
-              photoURL: user.photoURL || '',
-              lastSeen: serverTimestamp(),
-              status: 'online',
-              username: ''
-            });
-          } else {
-             await setDoc(userRef, {
-               lastSeen: serverTimestamp(),
-               status: 'online'
-             }, { merge: true });
-          }
+          // We don't await getDoc here to block onSnapshot, we just let it fetch
+          getDoc(userRef).then(async docSnap => {
+            if (!docSnap.exists()) {
+               await setDoc(userRef, {
+                uid: user.uid,
+                email: user.email,
+                displayName: user.displayName || 'Anonymous',
+                photoURL: user.photoURL || '',
+                lastSeen: serverTimestamp(),
+                status: 'online',
+                username: ''
+              });
+            } else {
+               await setDoc(userRef, {
+                 lastSeen: serverTimestamp(),
+                 status: 'online'
+               }, { merge: true });
+            }
+          }).catch(err => {
+            console.error("Failed to sync user details:", err);
+          });
+
         } catch (error: any) {
              console.error("Firestore error in useAuth:", error);
-             if (error?.message?.includes('offline') || error?.code === 'unavailable') {
-                 // Do not break the app completely if possible, but inform
-                 console.warn("User is offline or browser blocked connection.");
-             }
         }
       } else {
         setUser(null);
@@ -73,30 +75,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user) return;
     
-    // Fallback: don't spin forever if offline
-    const timeoutId = setTimeout(() => {
-       setLoading(false);
-    }, 2000);
-
     // Subscribe to profile changes
     const userRef = doc(db, 'users', user.uid);
     const unsubscribeProfile = onSnapshot(userRef, (doc) => {
       if (doc.exists()) {
         setProfile({ uid: doc.id, ...doc.data() } as UserProfile);
       } else {
-        setProfile(null);
+        setProfile(null); // Document doesn't exist yet, that's fine, we will handle it
       }
-      setLoading(false); // stop loading immediately when we get any data
-      clearTimeout(timeoutId);
+      setLoading(false); // only stop loading when profile is fetched successfully
+      setIsOffline(false);
     }, (error) => {
       console.error("Profile snapshot error:", error);
-      setLoading(false);
-      clearTimeout(timeoutId);
+      // We don't set loading to false on error because we don't want to show SetupProfile
+      setIsOffline(true);
     });
 
     return () => {
       unsubscribeProfile();
-      clearTimeout(timeoutId);
     };
   }, [user?.uid]);
 
@@ -118,7 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, profile, loading, isOffline, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

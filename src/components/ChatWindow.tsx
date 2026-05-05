@@ -8,6 +8,7 @@ import { cn } from '../lib/utils';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import UserProfileModal from './UserProfileModal';
+import { Avatar } from './Avatar';
 
 interface ChatWindowProps {
   chatId: string;
@@ -102,13 +103,10 @@ export default function ChatWindow({ chatId }: ChatWindowProps) {
         onClick={() => { if (otherUser) setShowProfile(true); }}
       >
         <div className="flex items-center gap-3">
-          {otherUser?.photoURL ? (
-            <img src={otherUser.photoURL} alt="" className="w-10 h-10 rounded-full border border-gray-100 dark:border-[#333] shadow-sm object-cover group-hover:opacity-80 transition-opacity" />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-[#1a1a1a] flex items-center justify-center group-hover:bg-gray-200 dark:group-hover:bg-[#222] transition-colors">
-              <MessageSquare className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-            </div>
-          )}
+          <Avatar 
+            src={otherUser?.photoURL} 
+            className="w-10 h-10 border border-gray-100 dark:border-[#333] shadow-sm group-hover:opacity-80 transition-opacity" 
+          />
           <div>
             <h2 className="font-medium text-[#1a1a1a] dark:text-white transition-colors">{otherUser?.displayName || 'Переписка'}</h2>
             <AnimatePresence mode="wait">

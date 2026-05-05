@@ -4,6 +4,7 @@ import { chatService } from '../services/chatService';
 import { UserProfile } from '../types';
 import { Search, UserPlus, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Avatar } from './Avatar';
 
 interface UserSearchProps {
   onStartChat: (chatId: string) => void;
@@ -77,11 +78,7 @@ export default function UserSearch({ onStartChat }: UserSearchProps) {
                 className="w-full flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-[#222] transition-colors border-b last:border-0 border-gray-50 dark:border-[#222]"
               >
                 <div className="flex items-center gap-3">
-                  {u.photoURL ? (
-                    <img src={u.photoURL} className="w-8 h-8 rounded-full" alt="" />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-[#333] flex items-center justify-center text-xs dark:text-gray-400">{u.displayName.charAt(0)}</div>
-                  )}
+                  <Avatar src={u.photoURL} className="w-8 h-8" />
                   <div className="text-left">
                     <div className="text-sm font-medium dark:text-white">{u.displayName}</div>
                     <div className="text-xs text-gray-400 dark:text-gray-500">@{u.username || 'unknown'}</div>

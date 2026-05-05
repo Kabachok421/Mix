@@ -10,20 +10,32 @@ import { LogOut, MessageSquare, Settings, User as UserIcon, Moon, Sun, X } from 
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 
+import { Avatar } from './components/Avatar';
+
 export default function App() {
-  const { user, profile, loading, logout } = useAuth();
+  const { user, profile, loading, isOffline, logout } = useAuth();
   const { theme, setTheme } = useTheme();
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f5f5f0] dark:bg-[#0a0a0a] transition-colors duration-500">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#f5f5f0] dark:bg-[#0a0a0a] transition-colors duration-500">
         <motion.div 
           animate={{ rotate: 360 }}
           transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
           className="w-12 h-12 border-4 border-[#5A5A40] dark:border-[#A0A080] border-t-transparent rounded-full"
         />
+        {isOffline && (
+          <motion.p 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            className="mt-6 text-sm text-gray-500 dark:text-gray-400 max-w-[200px] text-center"
+          >
+            Подключение к серверу...<br/>
+            (Ожидание ответа сети)
+          </motion.p>
+        )}
       </div>
     );
   }
@@ -71,11 +83,10 @@ export default function App() {
               className="flex items-center gap-3 cursor-pointer group"
               onClick={() => setShowSettings(true)}
             >
-              {profile?.photoURL ? (
-                <img src={profile.photoURL} alt="" className="w-9 h-9 border border-white dark:border-[#333] shadow-sm rounded-full object-cover group-hover:opacity-80 transition-opacity" />
-              ) : (
-                <div className="w-9 h-9 rounded-full bg-gray-200 dark:bg-[#333] flex items-center justify-center text-gray-500 dark:text-gray-400 group-hover:bg-gray-300 dark:group-hover:bg-[#444] transition-colors"><UserIcon className="w-4 h-4" /></div>
-              )}
+              <Avatar 
+                src={profile?.photoURL} 
+                className="w-9 h-9 border border-white dark:border-[#333] shadow-sm group-hover:opacity-80 group-hover:bg-gray-300 dark:group-hover:bg-[#444] transition-all" 
+              />
               <div className="text-left overflow-hidden">
                 <p className="text-sm font-medium text-[#1a1a1a] dark:text-white truncate">{profile?.displayName || user.displayName}</p>
                 <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate">@{profile?.username}</p>
