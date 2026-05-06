@@ -22,10 +22,33 @@ export function UserStatus({ user, className, showDotOnly }: UserStatusProps) {
 
   if (!user) return null;
 
-  // Let's treat "online" as definitely online, 
-  // but if it's been "online" for a very long time without updates, 
-  // it might be a ghost session. For now, trust user.status.
-  const isOnline = user.status === 'online';
+  const isOnline = (() => {
+    if (user.status !== 'online') return false;
+    
+    // Check if the "online" status is stale (older than 5 minutes)
+    if (user.lastSeen) {
+      let date: Date;
+      if (typeof user.lastSeen.toDate === 'function') {
+        date = user.lastSeen.toDate();
+      } else if (user.lastSeen.seconds) {
+        date = new Date(user.lastSeen.seconds * 1000);
+      } else if (typeof user.lastSeen === 'string' || typeof user.lastSeen === 'number') {
+        date = new Date(user.lastSeen);
+      } else {
+        return true; // Unknown format, trust status
+      }
+      
+      const now = new Date();
+      if (!isNaN(date.getTime())) {
+        const diffInMinutes = (now.getTime() - date.getTime()) / (1000 * 60);
+        if (diffInMinutes > 5) {
+          return false;
+        }
+      }
+    }
+    
+    return true;
+  })();
 
   if (showDotOnly) {
     if (!isOnline) return null;

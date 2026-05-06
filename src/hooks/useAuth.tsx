@@ -102,6 +102,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
+    let pingInterval: NodeJS.Timeout;
+    const startPing = () => {
+      pingInterval = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          setDoc(userRef, { status: 'online', lastSeen: serverTimestamp() }, { merge: true }).catch(console.error);
+        }
+      }, 2 * 60 * 1000); // Every 2 minutes
+    };
+    startPing();
+
     const handleBeforeUnload = () => {
       // In beforeunload, beacon or synchronous fetch is better, but this usually works enough for a simple setup.
       setDoc(userRef, { status: 'offline', lastSeen: serverTimestamp() }, { merge: true }).catch(console.error);
@@ -117,6 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       unsubscribeProfile();
+      clearInterval(pingInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       handleBeforeUnload();
