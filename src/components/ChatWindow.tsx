@@ -117,22 +117,22 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
         className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-[#222] bg-white/80 dark:bg-[#0d0d0d]/80 backdrop-blur-md z-10 cursor-pointer group flex-shrink-0"
         onClick={() => { if (otherUser) setShowProfile(true); }}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
           <button
             onClick={(e) => {
               e.stopPropagation();
               if (onClose) onClose();
             }}
-            className="sm:hidden p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-[#222] rounded-full transition-colors text-gray-500"
+            className="sm:hidden p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-[#222] rounded-full transition-colors text-gray-500 flex-shrink-0"
           >
             <ChevronLeft className="w-6 h-6" />
           </button>
           <Avatar 
             src={otherUser?.photoURL} 
-            className="w-10 h-10 border border-gray-100 dark:border-[#333] shadow-sm group-hover:opacity-80 transition-opacity" 
+            className="w-10 h-10 border border-gray-100 dark:border-[#333] shadow-sm group-hover:opacity-80 transition-opacity flex-shrink-0" 
           />
-          <div>
-            <h2 className="font-medium text-[#1a1a1a] dark:text-white transition-colors">{otherUser ? getUserDisplayName(otherUser) : 'Переписка'}</h2>
+          <div className="flex-1 min-w-0">
+            <h2 className="font-medium text-[#1a1a1a] dark:text-white transition-colors truncate">{otherUser ? getUserDisplayName(otherUser) : 'Переписка'}</h2>
             <AnimatePresence mode="wait">
               {isOtherTyping ? (
                 <motion.p 

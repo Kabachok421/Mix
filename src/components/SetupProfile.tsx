@@ -203,7 +203,6 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
                     value={customName} 
                     onChange={e => setCustomName(e.target.value)}
                     className="w-full bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#222] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#5A5A40]/30 dark:focus:ring-[#A0A080]/30 transition-shadow dark:text-white"
-                    placeholder="Например: Кот в сапогах"
                   />
                 </motion.div>
               )}
@@ -318,7 +317,6 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
                     value={customName} 
                     onChange={e => setCustomName(e.target.value)}
                     className="w-full bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#333] rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#5A5A40]/30 dark:focus:ring-[#A0A080]/30 transition-shadow dark:text-white"
-                    placeholder="Например: Кот в сапогах"
                   />
                 </motion.div>
               )}
