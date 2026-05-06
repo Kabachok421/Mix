@@ -91,6 +91,8 @@ service cloud.firestore {
           incoming().diff(existing()).affectedKeys().hasAny(['lastMessage', 'lastMessageSenderId', 'updatedAt'])
           && incoming().updatedAt == request.time
         );
+
+      allow delete: if isSignedIn() && existing().participantIds.hasAny([request.auth.uid]);
     }
 
     match /chats/{chatId}/messages/{messageId} {
@@ -98,8 +100,9 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds.hasAny([request.auth.uid]);
       
       allow create: if isSignedIn() && isValidMessage(incoming(), chatId) && isValidId(messageId);
-      // Messages are immutable in this version
-      allow update, delete: if false;
+      // Messages are immutable in this version, but can be deleted by sender
+      allow update: if false;
+      allow delete: if isSignedIn() && existing().senderId == request.auth.uid;
     }
 
     match /chats/{chatId}/typing/{userId} {

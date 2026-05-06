@@ -111,7 +111,7 @@ export default function App() {
         {/* Main Content */}
         <main className="hidden sm:flex flex-1 flex-col h-full bg-[#fafafa] dark:bg-[#0d0d0d]">
           {activeChatId ? (
-            <ChatWindow chatId={activeChatId} />
+            <ChatWindow chatId={activeChatId} onClose={() => setActiveChatId(null)} />
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center p-12 text-center text-gray-400 dark:text-gray-500 bg-white dark:bg-[#0d0d0d]">
               <motion.div 

@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { chatService } from '../services/chatService';
 import { Chat, Message, UserProfile } from '../types';
-import { Send, Smile, Paperclip, MoreVertical, MessageSquare } from 'lucide-react';
+import { Send, Smile, Paperclip, MoreVertical, MessageSquare, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, getUserDisplayName } from '../lib/utils';
 import { format } from 'date-fns';
@@ -12,17 +12,32 @@ import { Avatar } from './Avatar';
 
 interface ChatWindowProps {
   chatId: string;
+  onClose?: () => void;
 }
 
-export default function ChatWindow({ chatId }: ChatWindowProps) {
+export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
   const { user, profile } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [otherUser, setOtherUser] = useState<UserProfile | null>(null);
   const [isOtherTyping, setIsOtherTyping] = useState(false);
   const [input, setInput] = useState('');
   const [showProfile, setShowProfile] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleDeleteChat = async () => {
+    if (window.confirm('Вы уверены, что хотите удалить этого пользователя из друзей (удалить чат)? Это действие нельзя отменить.')) {
+      await chatService.deleteChat(chatId);
+      if (onClose) onClose();
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    if (window.confirm('Удалить это сообщение?')) {
+      await chatService.deleteMessage(chatId, messageId);
+    }
+  };
 
   useEffect(() => {
     if (!chatId || !user) return;
@@ -137,12 +152,43 @@ export default function ChatWindow({ chatId }: ChatWindowProps) {
             </AnimatePresence>
           </div>
         </div>
-        <button 
-          onClick={(e) => { e.stopPropagation(); /* any contextual menu action */ }}
-          className="p-2 hover:bg-gray-100 dark:hover:bg-[#222] rounded-full transition-colors text-gray-400"
-        >
-          <MoreVertical className="w-5 h-5" />
-        </button>
+        <div className="relative">
+          <button 
+            onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-[#222] rounded-full transition-colors text-gray-400"
+          >
+            <MoreVertical className="w-5 h-5" />
+          </button>
+          
+          <AnimatePresence>
+            {showMenu && (
+              <>
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={(e) => { e.stopPropagation(); setShowMenu(false); }}
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                  className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-[#1a1a1a] rounded-xl shadow-lg border border-gray-100 dark:border-[#333] overflow-hidden z-50 origin-top-right"
+                >
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowMenu(false);
+                      handleDeleteChat();
+                    }}
+                    className="w-full text-left px-4 py-3 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex items-center gap-2"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Удалить друга
+                  </button>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
       <AnimatePresence>
@@ -185,10 +231,20 @@ export default function ChatWindow({ chatId }: ChatWindowProps) {
                 >
                   {msg.text}
                   <div className={cn(
-                    "text-[9px] mt-1 opacity-50 font-sans text-right",
+                    "flex flex-row items-center justify-end text-[9px] mt-1 opacity-50 font-sans text-right",
                     isMe ? "text-white dark:text-black" : "text-gray-500"
                   )}>
-                    {msg.timestamp && format(msg.timestamp.toDate(), 'HH:mm', { locale: ru })}
+                    {isMe && (
+                      <button 
+                        onClick={() => handleDeleteMessage(msg.id)}
+                        className="mr-2 hover:text-red-300 dark:hover:text-red-600 transition-colors cursor-pointer"
+                        title="Удалить сообщение"
+                        type="button"
+                      >
+                        <Trash2 className="w-[10px] h-[10px]" />
+                      </button>
+                    )}
+                    <span>{msg.timestamp && format(msg.timestamp.toDate(), 'HH:mm', { locale: ru })}</span>
                   </div>
                 </div>
               </motion.div>

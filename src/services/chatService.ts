@@ -11,6 +11,7 @@ import {
   getDocs,
   getDoc,
   setDoc,
+  deleteDoc,
   limit
 } from 'firebase/firestore';
 import { db, handleFirestoreError } from '../lib/firebase';
@@ -160,5 +161,23 @@ export const chatService = {
         callback(false);
       }
     });
+  },
+
+  deleteMessage: async (chatId: string, messageId: string) => {
+    try {
+      const msgRef = doc(db, 'chats', chatId, 'messages', messageId);
+      await deleteDoc(msgRef);
+    } catch (error) {
+      handleFirestoreError(error, 'delete', `chats/${chatId}/messages/${messageId}`);
+    }
+  },
+
+  deleteChat: async (chatId: string) => {
+    try {
+      const chatRef = doc(db, 'chats', chatId);
+      await deleteDoc(chatRef);
+    } catch (error) {
+      handleFirestoreError(error, 'delete', `chats/${chatId}`);
+    }
   }
 };
