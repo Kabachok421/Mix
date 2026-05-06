@@ -18,6 +18,9 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const smallSliderRef = useRef<HTMLDivElement>(null);
+  const fullSliderRef = useRef<HTMLDivElement>(null);
+
   const isUsernameLocked = (() => {
     if (!profile?.usernameUpdatedAt) return false;
     try {
@@ -154,6 +157,7 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
 
           <div className="space-y-3 mt-2">
             <div 
+              ref={smallSliderRef}
               className={cn(
                 "relative h-12 w-full rounded-xl p-1 overflow-hidden transition-colors duration-500",
                 hideName ? "bg-[#1a1a1a] dark:bg-white" : "bg-gray-100 dark:bg-[#333]"
@@ -171,9 +175,10 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
                  dragConstraints={{ left: 0, right: 0 }}
                  dragElastic={0.4}
                  onDragEnd={(e, info) => {
-                   if (info.offset.x > 30 && !hideName) {
+                   const width = smallSliderRef.current?.offsetWidth || 200;
+                   if (info.offset.x > width * 0.6 && !hideName) {
                      setHideName(true);
-                   } else if (info.offset.x < -30 && hideName) {
+                   } else if (info.offset.x < -width * 0.6 && hideName) {
                      setHideName(false);
                    }
                  }}
@@ -268,6 +273,7 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
 
           <div className="space-y-4">
             <div 
+              ref={fullSliderRef}
               className={cn(
                 "relative h-14 w-full rounded-2xl p-1.5 overflow-hidden transition-colors duration-500 shadow-inner",
                 hideName ? "bg-[#1a1a1a] dark:bg-white" : "bg-gray-100 dark:bg-[#222]"
@@ -285,9 +291,10 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
                  dragConstraints={{ left: 0, right: 0 }}
                  dragElastic={0.4}
                  onDragEnd={(e, info) => {
-                   if (info.offset.x > 40 && !hideName) {
+                   const width = fullSliderRef.current?.offsetWidth || 200;
+                   if (info.offset.x > width * 0.6 && !hideName) {
                      setHideName(true);
-                   } else if (info.offset.x < -40 && hideName) {
+                   } else if (info.offset.x < -width * 0.6 && hideName) {
                      setHideName(false);
                    }
                  }}
