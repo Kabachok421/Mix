@@ -10,6 +10,7 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
   const { user, profile } = useAuth();
   const [username, setUsername] = useState(profile?.username || '');
   const [photoURL, setPhotoURL] = useState(profile?.photoURL || '');
+  const [hideName, setHideName] = useState(profile?.hideName || false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   
@@ -96,7 +97,7 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
 
     try {
       const userRef = doc(db, 'users', user.uid);
-      const dataToUpdate: any = { photoURL };
+      const dataToUpdate: any = { photoURL, hideName };
       if (isNewUsername) {
         dataToUpdate.username = username.toLowerCase();
         dataToUpdate.usernameUpdatedAt = serverTimestamp();
@@ -148,6 +149,19 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
           </div>
 
           {error && <p className="text-red-500 text-xs text-center">{error}</p>}
+
+          <div className="flex items-center gap-2 mt-2">
+            <input 
+              type="checkbox" 
+              id="hideNameSmall"
+              checked={hideName}
+              onChange={e => setHideName(e.target.checked)}
+              className="rounded border-gray-300 text-[#5A5A40] dark:bg-[#222] dark:border-gray-700" 
+            />
+            <label htmlFor="hideNameSmall" className="text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+              Скрыть моё имя для всех
+            </label>
+          </div>
 
           <button 
             type="submit" 
@@ -205,6 +219,19 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
           </div>
 
           {error && <p className="text-red-500 text-xs text-center">{error}</p>}
+
+          <div className="flex items-center gap-2">
+            <input 
+              type="checkbox" 
+              id="hideNameFull"
+              checked={hideName}
+              onChange={e => setHideName(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300 text-[#5A5A40] dark:bg-[#222] dark:border-gray-700" 
+            />
+            <label htmlFor="hideNameFull" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+              Скрыть моё имя для всех
+            </label>
+          </div>
 
           <button 
             type="submit" 

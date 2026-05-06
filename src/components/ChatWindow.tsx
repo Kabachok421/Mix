@@ -4,7 +4,7 @@ import { chatService } from '../services/chatService';
 import { Chat, Message, UserProfile } from '../types';
 import { Send, Smile, Paperclip, MoreVertical, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '../lib/utils';
+import { cn, getUserDisplayName } from '../lib/utils';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import UserProfileModal from './UserProfileModal';
@@ -15,7 +15,7 @@ interface ChatWindowProps {
 }
 
 export default function ChatWindow({ chatId }: ChatWindowProps) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [otherUser, setOtherUser] = useState<UserProfile | null>(null);
   const [isOtherTyping, setIsOtherTyping] = useState(false);
@@ -92,7 +92,7 @@ export default function ChatWindow({ chatId }: ChatWindowProps) {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     chatService.setTypingStatus(chatId, user.uid, false);
 
-    await chatService.sendMessage(chatId, user.uid, user.displayName || 'Anonymous', text);
+    await chatService.sendMessage(chatId, user.uid, getUserDisplayName(profile as UserProfile) || user.displayName || 'Anonymous', text);
   };
 
   return (
@@ -108,7 +108,7 @@ export default function ChatWindow({ chatId }: ChatWindowProps) {
             className="w-10 h-10 border border-gray-100 dark:border-[#333] shadow-sm group-hover:opacity-80 transition-opacity" 
           />
           <div>
-            <h2 className="font-medium text-[#1a1a1a] dark:text-white transition-colors">{otherUser?.displayName || 'Переписка'}</h2>
+            <h2 className="font-medium text-[#1a1a1a] dark:text-white transition-colors">{otherUser ? getUserDisplayName(otherUser) : 'Переписка'}</h2>
             <AnimatePresence mode="wait">
               {isOtherTyping ? (
                 <motion.p 
@@ -174,7 +174,7 @@ export default function ChatWindow({ chatId }: ChatWindowProps) {
                   isMe ? "self-end items-end" : "self-start items-start"
                 )}
               >
-                {!isMe && <span className="text-[10px] text-gray-400 dark:text-gray-600 ml-2 uppercase font-sans">{msg.senderName}</span>}
+                {!isMe && <span className="text-[10px] text-gray-400 dark:text-gray-600 ml-2 uppercase font-sans">{otherUser ? getUserDisplayName(otherUser) : msg.senderName}</span>}
                 <div
                   className={cn(
                     "px-4 py-2.5 rounded-2xl shadow-sm text-sm relative transition-all duration-300",

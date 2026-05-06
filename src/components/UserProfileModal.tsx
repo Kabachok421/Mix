@@ -5,6 +5,7 @@ import { X, User, Mail, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Avatar } from './Avatar';
+import { getUserDisplayName } from '../lib/utils';
 
 interface UserProfileModalProps {
   user: UserProfile;
@@ -52,7 +53,7 @@ export default function UserProfileModal({ user, onClose }: UserProfileModalProp
 
         <div className="px-6 pt-16 pb-8">
           <h2 className="text-2xl font-serif text-[#1a1a1a] dark:text-white leading-tight">
-            {user.displayName}
+            {getUserDisplayName(user)}
           </h2>
           <p className="text-sm text-green-500 dark:text-green-400 mt-1 capitalize-first">
             {lastSeenText}
@@ -71,17 +72,19 @@ export default function UserProfileModal({ user, onClose }: UserProfileModalProp
               </div>
             </div>
 
-            <div>
-              <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-2">Настоящее имя</p>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gray-50 dark:bg-[#222] flex items-center justify-center text-gray-400">
-                  <User className="w-5 h-5" />
-                </div>
-                <div className="text-[#1a1a1a] dark:text-gray-200 font-medium">
-                  {user.displayName}
+            {!user.hideName && (
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-2">Настоящее имя</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gray-50 dark:bg-[#222] flex items-center justify-center text-gray-400">
+                    <User className="w-5 h-5" />
+                  </div>
+                  <div className="text-[#1a1a1a] dark:text-gray-200 font-medium">
+                    {user.displayName}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
           </div>
         </div>

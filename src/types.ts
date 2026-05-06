@@ -9,6 +9,7 @@ export interface UserProfile {
   status: 'online' | 'offline';
   username?: string;
   usernameUpdatedAt?: Timestamp;
+  hideName?: boolean;
 }
 
 export interface Chat {

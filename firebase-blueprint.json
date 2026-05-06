@@ -10,7 +10,10 @@
         "displayName": { "type": "string" },
         "photoURL": { "type": "string" },
         "lastSeen": { "type": "string", "format": "date-time" },
-        "status": { "type": "string", "enum": ["online", "offline"] }
+        "status": { "type": "string", "enum": ["online", "offline"] },
+        "hideName": { "type": "boolean" },
+        "username": { "type": "string" },
+        "usernameUpdatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "email", "displayName"]
     },
