@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import UserProfileModal from './UserProfileModal';
 import { Avatar } from './Avatar';
+import { UserStatus } from './UserStatus';
 
 interface ChatWindowProps {
   chatId: string;
@@ -51,14 +52,12 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
     const participantIds = chatId.split('_');
     const otherUserId = participantIds.find(id => id !== user.uid);
 
-    const fetchChatMeta = async () => {
-      if (otherUserId) {
-        const profile = await chatService.getUserProfile(otherUserId);
+    let unsubscribeProfile: (() => void) | undefined;
+    if (otherUserId) {
+      unsubscribeProfile = chatService.subscribeToUserProfile(otherUserId, (profile) => {
         setOtherUser(profile);
-      }
-    };
-
-    fetchChatMeta();
+      });
+    }
 
     // Subscribe to typing status of the other user
     let unsubscribeTyping: (() => void) | undefined;
@@ -70,6 +69,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
 
     return () => {
       unsubscribeMessages();
+      if (unsubscribeProfile) unsubscribeProfile();
       if (unsubscribeTyping) unsubscribeTyping();
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
@@ -145,18 +145,17 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                   печaтaет...
                 </motion.p>
               ) : (
-                <motion.p 
+                <motion.div 
                   key="status"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className={cn(
-                    "text-[10px] uppercase tracking-widest font-sans font-semibold",
-                    otherUser?.status === 'online' ? "text-green-500 dark:text-green-400" : "text-gray-400 dark:text-gray-600"
-                  )}
                 >
-                  {otherUser?.status === 'online' ? 'В сети' : formatLastSeen(otherUser?.lastSeen)}
-                </motion.p>
+                  <UserStatus 
+                    user={otherUser} 
+                    className="text-[10px] uppercase tracking-widest font-sans font-semibold inline-block" 
+                  />
+                </motion.div>
               )}
             </AnimatePresence>
           </div>

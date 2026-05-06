@@ -13,6 +13,7 @@ interface ChatListProps {
 }
 
 import { Avatar } from './Avatar';
+import { UserStatus } from './UserStatus';
 
 export default function ChatList({ onSelectChat, activeChatId }: ChatListProps) {
   const { user } = useAuth();
@@ -22,22 +23,28 @@ export default function ChatList({ onSelectChat, activeChatId }: ChatListProps) 
   useEffect(() => {
     if (!user) return;
 
-    const unsubscribe = chatService.subscribeToChats(user.uid, async (newChats) => {
+    const unsubscribeMap: Record<string, () => void> = {};
+
+    const unsubscribeChats = chatService.subscribeToChats(user.uid, (newChats) => {
       setChats(newChats);
       
-      // Fetch participant profiles for chats
+      // Subscribe to participant profiles for chats
       for (const chat of newChats) {
         const otherUserId = chat.participantIds.find(id => id !== user.uid);
-        if (otherUserId && !participantsMap[otherUserId]) {
-          const profile = await chatService.getUserProfile(otherUserId);
-          if (profile) {
-            setParticipantsMap(prev => ({ ...prev, [otherUserId]: profile }));
-          }
+        if (otherUserId && !unsubscribeMap[otherUserId]) {
+          unsubscribeMap[otherUserId] = chatService.subscribeToUserProfile(otherUserId, (profile) => {
+            if (profile) {
+              setParticipantsMap(prev => ({ ...prev, [otherUserId]: profile }));
+            }
+          });
         }
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeChats();
+      Object.values(unsubscribeMap).forEach(unsub => unsub());
+    };
   }, [user]);
 
   return (
@@ -66,9 +73,7 @@ export default function ChatList({ onSelectChat, activeChatId }: ChatListProps) 
                     src={otherUser?.photoURL} 
                     className="w-12 h-12" 
                   />
-                  {otherUser?.status === 'online' && (
-                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-[#1a1a1a] rounded-full" />
-                  )}
+                  {otherUser && <UserStatus user={otherUser} showDotOnly />}
                 </div>
                 
                 <div className="flex-1 text-left min-w-0">

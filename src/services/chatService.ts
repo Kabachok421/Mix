@@ -121,6 +121,26 @@ export const chatService = {
     }
   },
 
+  // Subscribe to user profile (status, lastSeen, etc)
+  subscribeToUserProfile: (userId: string, callback: (profile: UserProfile | null) => void) => {
+    const docRef = doc(db, 'users', userId);
+    return onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        callback({ uid: docSnap.id, ...docSnap.data() } as UserProfile);
+      } else {
+        callback(null);
+      }
+    }, (error) => {
+      const errInfo = {
+        error: error instanceof Error ? error.message : String(error),
+        authInfo: { userId: auth.currentUser?.uid },
+        operationType: 'get',
+        path: `users/${userId}`
+      };
+      console.error('Firestore Error: ', JSON.stringify(errInfo));
+    });
+  },
+
   // Get user profile
   getUserProfile: async (userId: string) => {
     try {

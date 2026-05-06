@@ -17,11 +17,25 @@ export function getUserDisplayName(user: UserProfile | undefined): string {
   return user.displayName || 'Anonymous';
 }
 
-export function formatLastSeen(lastSeen: Timestamp | undefined | null): string {
+export function formatLastSeen(lastSeen: any): string {
   if (!lastSeen) return 'Оффлайн';
   
   const now = new Date();
-  const date = typeof lastSeen.toDate === 'function' ? lastSeen.toDate() : new Date(lastSeen as unknown as string);
+  let date: Date;
+
+  if (typeof lastSeen.toDate === 'function') {
+    date = lastSeen.toDate();
+  } else if (lastSeen.seconds) {
+    date = new Date(lastSeen.seconds * 1000);
+  } else if (typeof lastSeen === 'string' || typeof lastSeen === 'number') {
+    date = new Date(lastSeen);
+  } else {
+    return 'Оффлайн';
+  }
+
+  // Handle Invalid Date
+  if (isNaN(date.getTime())) return 'Оффлайн';
+
   const diffInMs = now.getTime() - date.getTime();
   const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
   const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));

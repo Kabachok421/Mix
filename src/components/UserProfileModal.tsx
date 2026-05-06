@@ -5,7 +5,8 @@ import { X, User, Mail, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Avatar } from './Avatar';
-import { getUserDisplayName, formatLastSeen } from '../lib/utils';
+import { UserStatus } from './UserStatus';
+import { getUserDisplayName } from '../lib/utils';
 
 interface UserProfileModalProps {
   user: UserProfile;
@@ -13,12 +14,6 @@ interface UserProfileModalProps {
 }
 
 export default function UserProfileModal({ user, onClose }: UserProfileModalProps) {
-  const isOnline = user.status === 'online';
-  
-  const lastSeenText = isOnline 
-    ? 'В сети' 
-    : formatLastSeen(user.lastSeen);
-
   return (
     <>
       <motion.div 
@@ -53,9 +48,9 @@ export default function UserProfileModal({ user, onClose }: UserProfileModalProp
           <h2 className="text-2xl font-serif text-[#1a1a1a] dark:text-white leading-tight">
             {getUserDisplayName(user)}
           </h2>
-          <p className="text-sm text-green-500 dark:text-green-400 mt-1 capitalize-first">
-            {lastSeenText}
-          </p>
+          <div className="text-sm mt-1 capitalize-first">
+            {user ? <UserStatus user={user} className="" /> : null}
+          </div>
 
           <div className="mt-8 space-y-6">
             <div>
