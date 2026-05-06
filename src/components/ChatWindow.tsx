@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { chatService } from '../services/chatService';
 import { Chat, Message, UserProfile } from '../types';
-import { Send, Smile, Paperclip, MoreVertical, MessageSquare, Trash2 } from 'lucide-react';
+import { Send, Smile, Paperclip, MoreVertical, MessageSquare, Trash2, ChevronLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, getUserDisplayName } from '../lib/utils';
 import { format } from 'date-fns';
@@ -114,10 +114,19 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
     <div className="flex-1 flex flex-col bg-white dark:bg-[#0d0d0d] overflow-hidden transition-colors duration-500">
       {/* Header */}
       <div 
-        className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-[#222] bg-white/80 dark:bg-[#0d0d0d]/80 backdrop-blur-md z-10 cursor-pointer group"
+        className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-[#222] bg-white/80 dark:bg-[#0d0d0d]/80 backdrop-blur-md z-10 cursor-pointer group flex-shrink-0"
         onClick={() => { if (otherUser) setShowProfile(true); }}
       >
         <div className="flex items-center gap-3">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onClose) onClose();
+            }}
+            className="sm:hidden p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-[#222] rounded-full transition-colors text-gray-500"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
           <Avatar 
             src={otherUser?.photoURL} 
             className="w-10 h-10 border border-gray-100 dark:border-[#333] shadow-sm group-hover:opacity-80 transition-opacity" 

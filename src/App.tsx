@@ -61,10 +61,13 @@ export default function App() {
 
   return (
     <div className="h-screen flex bg-[#f5f5f0] dark:bg-[#050505] overflow-hidden p-0 sm:p-4 transition-colors duration-500 font-sans">
-      <div className="flex-1 flex max-w-6xl mx-auto w-full bg-white dark:bg-[#111111] sm:rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.6)] overflow-hidden border border-[#e5e5e0] dark:border-[#222] transition-colors">
+      <div className="flex-1 flex max-w-6xl mx-auto w-full bg-white dark:bg-[#111111] sm:rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.6)] overflow-hidden border border-[#e5e5e0] dark:border-[#222] transition-colors relative">
         
         {/* Sidebar */}
-        <aside className="w-full sm:w-[380px] flex flex-col border-r border-gray-100 dark:border-[#222] h-full relative z-20">
+        <aside className={cn(
+          "w-full sm:w-[380px] flex-col border-r border-gray-100 dark:border-[#222] h-full relative z-20",
+          activeChatId ? "hidden sm:flex" : "flex"
+        )}>
           <div className="p-6 flex items-center justify-between">
             <h1 className="text-2xl font-serif text-[#1a1a1a] dark:text-white">Mix</h1>
             <div className="flex items-center gap-2">
@@ -109,7 +112,10 @@ export default function App() {
         </aside>
 
         {/* Main Content */}
-        <main className="hidden sm:flex flex-1 flex-col h-full bg-[#fafafa] dark:bg-[#0d0d0d]">
+        <main className={cn(
+          "flex-1 flex-col h-full bg-[#fafafa] dark:bg-[#0d0d0d]",
+          activeChatId ? "flex" : "hidden sm:flex"
+        )}>
           {activeChatId ? (
             <ChatWindow chatId={activeChatId} onClose={() => setActiveChatId(null)} />
           ) : (
