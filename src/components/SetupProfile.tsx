@@ -2,15 +2,17 @@ import React, { useState, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { motion } from 'motion/react';
-import { User, Camera, Save } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { User, Camera, Save, EyeOff, Eye, GripVertical } from 'lucide-react';
 import { Avatar } from './Avatar';
+import { cn } from '../lib/utils';
 
 export default function SetupProfile({ onComplete, fullPage = true }: { onComplete?: () => void, fullPage?: boolean }) {
   const { user, profile } = useAuth();
   const [username, setUsername] = useState(profile?.username || '');
   const [photoURL, setPhotoURL] = useState(profile?.photoURL || '');
   const [hideName, setHideName] = useState(profile?.hideName || false);
+  const [customName, setCustomName] = useState(profile?.customName || '');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   
@@ -97,7 +99,7 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
 
     try {
       const userRef = doc(db, 'users', user.uid);
-      const dataToUpdate: any = { photoURL, hideName };
+      const dataToUpdate: any = { photoURL, hideName, customName: hideName ? customName.trim() : '' };
       if (isNewUsername) {
         dataToUpdate.username = username.toLowerCase();
         dataToUpdate.usernameUpdatedAt = serverTimestamp();
@@ -150,17 +152,62 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
 
           {error && <p className="text-red-500 text-xs text-center">{error}</p>}
 
-          <div className="flex items-center gap-2 mt-2">
-            <input 
-              type="checkbox" 
-              id="hideNameSmall"
-              checked={hideName}
-              onChange={e => setHideName(e.target.checked)}
-              className="rounded border-gray-300 text-[#5A5A40] dark:bg-[#222] dark:border-gray-700" 
-            />
-            <label htmlFor="hideNameSmall" className="text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-              Скрыть моё имя для всех
-            </label>
+          <div className="space-y-3 mt-2">
+            <div 
+              className={cn(
+                "relative h-12 w-full rounded-xl p-1 overflow-hidden transition-colors duration-500",
+                hideName ? "bg-[#1a1a1a] dark:bg-white" : "bg-gray-100 dark:bg-[#333]"
+              )}
+            >
+               <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-4">
+                 <span className={cn("text-xs font-medium transition-colors duration-500", hideName ? "text-white dark:text-black" : "text-gray-500 dark:text-gray-400")}>
+                   {hideName ? "Реальное имя скрыто" : "Потяните чтобы скрыть имя"}
+                 </span>
+               </div>
+               
+               <motion.div
+                 layout
+                 drag="x"
+                 dragConstraints={{ left: 0, right: 0 }}
+                 dragElastic={0.4}
+                 onDragEnd={(e, info) => {
+                   if (info.offset.x > 30 && !hideName) {
+                     setHideName(true);
+                   } else if (info.offset.x < -30 && hideName) {
+                     setHideName(false);
+                   }
+                 }}
+                 className={cn(
+                    "h-full w-12 rounded-[10px] bg-white dark:bg-black shadow flex items-center justify-center cursor-grab active:cursor-grabbing z-10 relative pointer-events-auto",
+                    hideName ? "ml-auto" : "ml-0"
+                 )}
+               >
+                 <motion.div animate={{ rotate: hideName ? 180 : 0 }} className="flex items-center text-gray-800 dark:text-gray-200">
+                    <GripVertical className="w-3 h-3 opacity-30" />
+                    {hideName ? <EyeOff className="w-4 h-4 ml-[-2px]" /> : <Eye className="w-4 h-4 ml-[-2px]" />}
+                 </motion.div>
+               </motion.div>
+            </div>
+
+            <AnimatePresence>
+              {hideName && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                  animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
+                  exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                  className="overflow-hidden"
+                >
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Отображаемое имя (необязательно)</label>
+                  <input 
+                    type="text" 
+                    value={customName} 
+                    onChange={e => setCustomName(e.target.value)}
+                    className="w-full bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#222] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#5A5A40]/30 dark:focus:ring-[#A0A080]/30 transition-shadow dark:text-white"
+                    placeholder="Например: Кот в сапогах"
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           <button 
@@ -220,17 +267,62 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
 
           {error && <p className="text-red-500 text-xs text-center">{error}</p>}
 
-          <div className="flex items-center gap-2">
-            <input 
-              type="checkbox" 
-              id="hideNameFull"
-              checked={hideName}
-              onChange={e => setHideName(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300 text-[#5A5A40] dark:bg-[#222] dark:border-gray-700" 
-            />
-            <label htmlFor="hideNameFull" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-              Скрыть моё имя для всех
-            </label>
+          <div className="space-y-4">
+            <div 
+              className={cn(
+                "relative h-14 w-full rounded-2xl p-1.5 overflow-hidden transition-colors duration-500 shadow-inner",
+                hideName ? "bg-[#1a1a1a] dark:bg-white" : "bg-gray-100 dark:bg-[#222]"
+              )}
+            >
+               <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-4">
+                 <span className={cn("text-sm font-medium transition-colors duration-500", hideName ? "text-[#f5f5f0] dark:text-[#1a1a1a]" : "text-gray-500 dark:text-gray-400")}>
+                   {hideName ? "Реальное имя скрыто" : "Потяните чтобы скрыть имя"}
+                 </span>
+               </div>
+               
+               <motion.div
+                 layout
+                 drag="x"
+                 dragConstraints={{ left: 0, right: 0 }}
+                 dragElastic={0.4}
+                 onDragEnd={(e, info) => {
+                   if (info.offset.x > 40 && !hideName) {
+                     setHideName(true);
+                   } else if (info.offset.x < -40 && hideName) {
+                     setHideName(false);
+                   }
+                 }}
+                 className={cn(
+                    "h-full w-14 rounded-xl bg-white dark:bg-black shadow-md flex items-center justify-center cursor-grab active:cursor-grabbing z-10 relative pointer-events-auto",
+                    hideName ? "ml-auto" : "ml-0"
+                 )}
+               >
+                 <motion.div animate={{ rotate: hideName ? 180 : 0 }} className="flex items-center text-gray-800 dark:text-gray-200">
+                    <GripVertical className="w-4 h-4 opacity-30" />
+                    {hideName ? <EyeOff className="w-5 h-5 ml-[-2px]" /> : <Eye className="w-5 h-5 ml-[-2px]" />}
+                 </motion.div>
+               </motion.div>
+            </div>
+
+            <AnimatePresence>
+              {hideName && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                  animate={{ opacity: 1, height: 'auto', marginTop: 16 }}
+                  exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                  className="overflow-hidden"
+                >
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Отображаемое имя (необязательно)</label>
+                  <input 
+                    type="text" 
+                    value={customName} 
+                    onChange={e => setCustomName(e.target.value)}
+                    className="w-full bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#333] rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#5A5A40]/30 dark:focus:ring-[#A0A080]/30 transition-shadow dark:text-white"
+                    placeholder="Например: Кот в сапогах"
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           <button 

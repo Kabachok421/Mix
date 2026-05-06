@@ -10,6 +10,7 @@ export interface UserProfile {
   username?: string;
   usernameUpdatedAt?: Timestamp;
   hideName?: boolean;
+  customName?: string;
 }
 
 export interface Chat {

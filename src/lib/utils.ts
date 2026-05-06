@@ -9,6 +9,7 @@ export function cn(...inputs: ClassValue[]) {
 export function getUserDisplayName(user: UserProfile | undefined): string {
   if (!user) return 'Anonymous';
   if (user.hideName) {
+    if (user.customName && user.customName.trim().length > 0) return user.customName;
     if (user.username) return `@${user.username}`;
     return 'Скрытый пользователь';
   }
