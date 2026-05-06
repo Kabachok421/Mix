@@ -5,7 +5,7 @@ import { X, User, Mail, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Avatar } from './Avatar';
-import { getUserDisplayName } from '../lib/utils';
+import { getUserDisplayName, formatLastSeen } from '../lib/utils';
 
 interface UserProfileModalProps {
   user: UserProfile;
@@ -16,10 +16,8 @@ export default function UserProfileModal({ user, onClose }: UserProfileModalProp
   const isOnline = user.status === 'online';
   
   const lastSeenText = isOnline 
-    ? 'в сети' 
-    : user.lastSeen 
-      ? `был(а) ${formatDistanceToNow(user.lastSeen.toDate(), { locale: ru, addSuffix: true })}` 
-      : 'давно';
+    ? 'В сети' 
+    : formatLastSeen(user.lastSeen);
 
   return (
     <>

@@ -4,7 +4,7 @@ import { chatService } from '../services/chatService';
 import { Chat, Message, UserProfile } from '../types';
 import { Send, Smile, Paperclip, MoreVertical, MessageSquare, Trash2, ChevronLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn, getUserDisplayName } from '../lib/utils';
+import { cn, getUserDisplayName, formatLastSeen } from '../lib/utils';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import UserProfileModal from './UserProfileModal';
@@ -155,7 +155,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                     otherUser?.status === 'online' ? "text-green-500 dark:text-green-400" : "text-gray-400 dark:text-gray-600"
                   )}
                 >
-                  {otherUser?.status === 'online' ? 'В сети' : 'Оффлайн'}
+                  {otherUser?.status === 'online' ? 'В сети' : formatLastSeen(otherUser?.lastSeen)}
                 </motion.p>
               )}
             </AnimatePresence>

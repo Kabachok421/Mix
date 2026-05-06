@@ -85,18 +85,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (doc.exists()) {
         setProfile({ uid: doc.id, ...doc.data() } as UserProfile);
       } else {
-        setProfile(null); // Document doesn't exist yet, that's fine, we will handle it
+        setProfile(null); 
       }
-      setLoading(false); // only stop loading when profile is fetched successfully
+      setLoading(false);
       setIsOffline(false);
     }, (error) => {
       console.error("Profile snapshot error:", error);
-      // We don't set loading to false on error because we don't want to show SetupProfile
       setIsOffline(true);
     });
 
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        setDoc(userRef, { status: 'online', lastSeen: serverTimestamp() }, { merge: true }).catch(console.error);
+      } else {
+        setDoc(userRef, { status: 'offline', lastSeen: serverTimestamp() }, { merge: true }).catch(console.error);
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      // In beforeunload, beacon or synchronous fetch is better, but this usually works enough for a simple setup.
+      setDoc(userRef, { status: 'offline', lastSeen: serverTimestamp() }, { merge: true }).catch(console.error);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // Ensure status is updated if we become active
+    if (document.visibilityState === 'visible') {
+      handleVisibilityChange();
+    }
+
     return () => {
       unsubscribeProfile();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      handleBeforeUnload();
     };
   }, [user?.uid]);
 
