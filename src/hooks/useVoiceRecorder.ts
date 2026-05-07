@@ -28,8 +28,8 @@ export function useVoiceRecorder() {
         setDuration((prev) => prev + 1);
       }, 1000);
     } catch (err) {
-      console.error('Error accessing microphone:', err);
-      alert('Микрофон недоступен. Пожалуйста, разрешите доступ к микрофону.');
+      console.warn('Error accessing microphone:', err);
+      alert('Микрофон недоступен. Убедитесь, что вы разрешили доступ к микрофону, или откройте приложение в новой вкладке.');
     }
   }, []);
 

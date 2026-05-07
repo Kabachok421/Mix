@@ -71,8 +71,8 @@ export function CallScreen({ callId, isCaller, onClose }: { callId: string; isCa
           };
         }
       } catch (e) {
-        console.error("Error accessing media devices", e);
-        alert("Не удалось получить доступ к камере или микрофону");
+        console.warn("Error accessing media devices", e);
+        alert("Не удалось получить доступ к камере или микрофону. Убедитесь, что вы предоставили разрешения, или откройте приложение в новой вкладке.");
         endCall();
       }
     };
@@ -155,7 +155,8 @@ export function CallScreen({ callId, isCaller, onClose }: { callId: string; isCa
 
         setIsScreenSharing(true);
       } catch (e) {
-        console.error("Screen sharing failed", e);
+        console.warn("Screen sharing failed", e);
+        alert("Не удалось получить доступ к трансляции экрана. Убедитесь, что вы предоставили разрешения, или откройте приложение в новой вкладке.");
       }
     } else {
       stopScreenShare();
