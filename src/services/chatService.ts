@@ -14,7 +14,12 @@ import {
   deleteDoc,
   limit
 } from 'firebase/firestore';
-import { db, handleFirestoreError } from '../lib/firebase';
+import { 
+  ref, 
+  uploadBytes, 
+  getDownloadURL 
+} from 'firebase/storage';
+import { db, storage, handleFirestoreError } from '../lib/firebase';
 import { Chat, Message, UserProfile } from '../types';
 
 export const chatService = {
@@ -51,25 +56,47 @@ export const chatService = {
       callback(messages);
     }, (error) => handleFirestoreError(error, 'list', `chats/${chatId}/messages`));
   },
+  
+  // Upload file
+  uploadFile: async (path: string, file: Blob | File) => {
+    try {
+      const storageRef = ref(storage, path);
+      await uploadBytes(storageRef, file);
+      return await getDownloadURL(storageRef);
+    } catch (error) {
+      console.error('File upload error:', error);
+      throw error;
+    }
+  },
 
   // Send a message
-  sendMessage: async (chatId: string, senderId: string, senderName: string, text: string) => {
+  sendMessage: async (chatId: string, senderId: string, senderName: string, data: Partial<Message>) => {
     try {
       const messagesRef = collection(db, 'chats', chatId, 'messages');
       const chatRef = doc(db, 'chats', chatId);
 
       const timestamp = serverTimestamp();
-
-      // We use a transaction-like update by simply performing both, rules will protect atomicity of the chat state if needed
-      await addDoc(messagesRef, {
-        text,
+      
+      const messageData = {
+        ...data,
         senderId,
         senderName,
-        timestamp
-      });
+        timestamp,
+        type: data.type || 'text'
+      };
+
+      await addDoc(messagesRef, messageData);
+
+      let lastMessageText = '';
+      switch (messageData.type) {
+        case 'image': lastMessageText = '📷 Фото'; break;
+        case 'voice': lastMessageText = '🎤 Голосовое сообщение'; break;
+        case 'file': lastMessageText = `📁 ${messageData.fileName || 'Файл'}`; break;
+        default: lastMessageText = messageData.text || '';
+      }
 
       await updateDoc(chatRef, {
-        lastMessage: text,
+        lastMessage: lastMessageText,
         lastMessageSenderId: senderId,
         updatedAt: timestamp
       });

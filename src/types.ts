@@ -22,10 +22,25 @@ export interface Chat {
   participants?: UserProfile[]; // Populated locally
 }
 
+export interface Call {
+  id: string;
+  callerId: string;
+  participantIds: string[];
+  status: 'calling' | 'ringing' | 'accepted' | 'rejected' | 'ended';
+  offer?: any;
+  answer?: any;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
 export interface Message {
   id: string;
-  text: string;
+  text?: string;
   senderId: string;
   senderName: string;
   timestamp: Timestamp;
+  type: 'text' | 'image' | 'file' | 'voice';
+  url?: string;
+  fileName?: string;
+  fileSize?: number;
+  duration?: number; // for voice
 }

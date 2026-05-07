@@ -52,10 +52,12 @@ service cloud.firestore {
 
     function isValidMessage(data, chatId) {
       // Relational check: sender must be participant in parent chat
-      return data.keys().hasAll(['text', 'senderId', 'timestamp'])
+      return data.keys().hasAll(['senderId', 'timestamp', 'type'])
         && data.senderId == request.auth.uid
-        && data.text is string && data.text.size() <= 5000
         && data.timestamp == request.time
+        && data.type in ['text', 'image', 'file', 'voice']
+        && (data.type != 'text' || (data.get('text', '') is string && data.get('text', '').size() <= 5000))
+        && (data.type == 'text' || (data.get('url', '') is string && data.get('url', '').size() <= 1024))
         && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
     }
 
@@ -118,6 +120,39 @@ service cloud.firestore {
         && incoming().keys().hasAll(['isTyping', 'updatedAt'])
         && incoming().isTyping is bool
         && incoming().updatedAt == request.time;
+    }
+
+    match /calls/{callId} {
+      allow list, get: if isSignedIn() && (resource == null || resource.data.participantIds.hasAny([request.auth.uid]));
+      allow create: if isSignedIn()
+        && incoming().keys().hasAll(['participantIds', 'status', 'callerId', 'offer', 'createdAt', 'updatedAt'])
+        && incoming().participantIds is list
+        && request.auth.uid in incoming().participantIds
+        && incoming().callerId == request.auth.uid
+        && isValidId(callId);
+      
+      allow update: if isSignedIn()
+        && existing().participantIds.hasAny([request.auth.uid])
+        && incoming().participantIds == existing().participantIds
+        && incoming().diff(existing()).affectedKeys().hasAny(['status', 'answer', 'updatedAt'])
+        && incoming().updatedAt == request.time;
+        
+      allow delete: if isSignedIn() && existing().participantIds.hasAny([request.auth.uid]);
+      
+      match /callerCandidates/{candidateId} {
+        allow read: if isSignedIn() && get(/databases/$(database)/documents/calls/$(callId)).data.participantIds.hasAny([request.auth.uid]);
+        allow create: if isSignedIn() 
+          && get(/databases/$(database)/documents/calls/$(callId)).data.callerId == request.auth.uid
+          && isValidId(candidateId);
+      }
+      
+      match /receiverCandidates/{candidateId} {
+        allow read: if isSignedIn() && get(/databases/$(database)/documents/calls/$(callId)).data.participantIds.hasAny([request.auth.uid]);
+        allow create: if isSignedIn() 
+          && get(/databases/$(database)/documents/calls/$(callId)).data.participantIds.hasAny([request.auth.uid])
+          && get(/databases/$(database)/documents/calls/$(callId)).data.callerId != request.auth.uid
+          && isValidId(candidateId);
+      }
     }
   }
 }

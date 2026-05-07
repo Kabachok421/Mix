@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { chatService } from '../services/chatService';
 import { Chat, Message, UserProfile } from '../types';
-import { Send, Smile, Paperclip, MoreVertical, MessageSquare, Trash2, ChevronLeft } from 'lucide-react';
+import { Send, Smile, Paperclip, MoreVertical, MessageSquare, Trash2, ChevronLeft, Mic, X, Image as ImageIcon, File as FileIcon, Loader2, Video } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, getUserDisplayName, formatLastSeen } from '../lib/utils';
 import { format } from 'date-fns';
@@ -10,6 +10,10 @@ import { ru } from 'date-fns/locale';
 import UserProfileModal from './UserProfileModal';
 import { Avatar } from './Avatar';
 import { UserStatus } from './UserStatus';
+import { useVoiceRecorder } from '../hooks/useVoiceRecorder';
+import { VoiceMessage } from './VoiceMessage';
+import { FileMessage } from './FileMessage';
+import { callService } from '../services/callService';
 
 interface ChatWindowProps {
   chatId: string;
@@ -26,6 +30,12 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
   const [showMenu, setShowMenu] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  
+  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const { isRecording, duration, startRecording, stopRecording, cancelRecording } = useVoiceRecorder();
 
   const handleDeleteChat = async () => {
     if (window.confirm('Вы уверены, что хотите удалить этого пользователя из друзей (удалить чат)? Это действие нельзя отменить.')) {
@@ -107,7 +117,72 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     chatService.setTypingStatus(chatId, user.uid, false);
 
-    await chatService.sendMessage(chatId, user.uid, getUserDisplayName(profile as UserProfile) || user.displayName || 'Anonymous', text);
+    await chatService.sendMessage(chatId, user.uid, getUserDisplayName(profile as UserProfile) || user.displayName || 'Anonymous', { text, type: 'text' });
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'file') => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    try {
+      setIsUploading(true);
+      setShowAttachmentMenu(false);
+
+      const path = `chats/${chatId}/${Date.now()}_${file.name}`;
+      const url = await chatService.uploadFile(path, file);
+
+      await chatService.sendMessage(
+        chatId, 
+        user.uid, 
+        getUserDisplayName(profile as UserProfile) || user.displayName || 'Anonymous', 
+        { 
+          type, 
+          url, 
+          fileName: file.name, 
+          fileSize: file.size 
+        }
+      );
+    } catch (error) {
+      console.error('File upload failed:', error);
+      alert('Ошибка при загрузке файла');
+    } finally {
+      setIsUploading(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleVoiceSend = async () => {
+    const recording = await stopRecording();
+    if (!recording || !user) return;
+
+    try {
+      setIsUploading(true);
+      const path = `chats/${chatId}/voice_${Date.now()}.webm`;
+      const url = await chatService.uploadFile(path, recording.blob);
+
+      await chatService.sendMessage(
+        chatId, 
+        user.uid, 
+        getUserDisplayName(profile as UserProfile) || user.displayName || 'Anonymous', 
+        { 
+          type: 'voice', 
+          url, 
+          duration: recording.duration 
+        }
+      );
+    } catch (error) {
+      alert('Ошибка при отправке голосового сообщения');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleStartCall = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user || !otherUser) return;
+    const participantIds = [user.uid, otherUser.uid];
+    const newCallId = await callService.createCall(participantIds, user.uid);
+    window.dispatchEvent(new CustomEvent('START_CALL', { detail: { callId: newCallId, isCaller: true } }));
   };
 
   return (
@@ -160,7 +235,15 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
             </AnimatePresence>
           </div>
         </div>
-        <div className="relative">
+        <div className="relative flex items-center">
+          {otherUser?.status === 'online' && (
+            <button
+              onClick={handleStartCall}
+              className="p-2 mr-1 hover:bg-gray-100 dark:hover:bg-[#222] rounded-full transition-colors text-gray-400 hover:text-green-500"
+            >
+              <Video className="w-5 h-5" />
+            </button>
+          )}
           <button 
             onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
             className="p-2 hover:bg-gray-100 dark:hover:bg-[#222] rounded-full transition-colors text-gray-400"
@@ -234,10 +317,17 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                     "px-4 py-2.5 rounded-2xl shadow-sm text-sm relative transition-all duration-300",
                     isMe 
                       ? "bg-[#1a1a1a] dark:bg-[#e5e5e0] text-white dark:text-black rounded-tr-none shadow-md" 
-                      : "bg-white dark:bg-[#1e1e1e] border border-gray-100 dark:border-[#333] text-gray-800 dark:text-gray-200 rounded-tl-none shadow-sm"
+                      : "bg-white dark:bg-[#1e1e1e] border border-gray-100 dark:border-[#333] text-gray-800 dark:text-gray-200 rounded-tl-none shadow-sm",
+                    (msg.type === 'image' || msg.type === 'voice' || msg.type === 'file') && "p-1.5"
                   )}
                 >
-                  {msg.text}
+                  {msg.type === 'voice' ? (
+                    <VoiceMessage url={msg.url!} duration={msg.duration} isMe={isMe} />
+                  ) : msg.type === 'image' || msg.type === 'file' ? (
+                    <FileMessage type={msg.type} url={msg.url!} fileName={msg.fileName} fileSize={msg.fileSize} isMe={isMe} />
+                  ) : (
+                    msg.text
+                  )}
                   <div className={cn(
                     "flex flex-row items-center justify-end text-[9px] mt-1 opacity-50 font-sans text-right",
                     isMe ? "text-white dark:text-black" : "text-gray-500"
@@ -263,29 +353,149 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
       </div>
 
       {/* Input */}
-      <div className="p-4 bg-white dark:bg-[#0d0d0d] border-t border-gray-100 dark:border-[#222] transition-colors">
-        <form onSubmit={handleSend} className="flex items-center gap-3 bg-gray-50 dark:bg-[#1a1a1a] p-2 rounded-[24px] border border-gray-100 dark:border-[#222] focus-within:ring-2 focus-within:ring-[#5A5A40]/10 dark:focus-within:ring-[#A0A080]/10 transition-all">
-          <button type="button" className="p-2 hover:bg-gray-200 dark:hover:bg-[#222] rounded-full text-gray-400 transition-colors">
-            <Smile className="w-5 h-5" />
-          </button>
-          <input
-            type="text"
-            value={input}
-            onChange={handleInputChange}
-            placeholder="Напишите сообщение..."
-            className="flex-1 bg-transparent border-none outline-none text-sm py-2 dark:text-white"
-          />
-          <button type="button" className="p-2 hover:bg-gray-200 dark:hover:bg-[#222] rounded-full text-gray-400 transition-colors">
-            <Paperclip className="w-5 h-5" />
-          </button>
-          <button 
-            type="submit" 
-            disabled={!input.trim()}
-            className="p-3 bg-[#1a1a1a] dark:bg-[#e5e5e0] text-white dark:text-black rounded-full hover:bg-black dark:hover:bg-white disabled:opacity-50 transition-all shadow-md active:scale-95"
-          >
-            <Send className="w-4 h-4" />
-          </button>
-        </form>
+      <div className="p-4 bg-white dark:bg-[#0d0d0d] border-t border-gray-100 dark:border-[#222] transition-colors relative">
+        {isUploading && (
+          <div className="absolute top-0 left-0 right-0 h-1 bg-blue-500 overflow-hidden">
+            <motion.div 
+              initial={{ x: "-100%" }}
+              animate={{ x: "100%" }}
+              transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+              className="h-full bg-blue-300"
+            />
+          </div>
+        )}
+
+        {isRecording ? (
+          <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-900/10 p-2 rounded-[24px] border border-blue-100 dark:border-blue-900/30 transition-all">
+            <div className="flex-1 flex items-center gap-3 px-3">
+              <motion.div
+                animate={{ opacity: [1, 0.5, 1] }}
+                transition={{ repeat: Infinity, duration: 1 }}
+                className="w-2.5 h-2.5 rounded-full bg-red-500"
+              />
+              <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                {Math.floor(duration / 60)}:{(duration % 60).toString().padStart(2, '0')}
+              </span>
+              <div className="flex-1 overflow-hidden">
+                <motion.div 
+                  className="flex gap-1"
+                  animate={{ x: [0, -20, 0] }}
+                  transition={{ repeat: Infinity, duration: 2 }}
+                >
+                  {[...Array(20)].map((_, i) => (
+                    <div key={i} className="w-1 h-4 bg-blue-300 dark:bg-blue-700/50 rounded-full" />
+                  ))}
+                </motion.div>
+              </div>
+            </div>
+            <button 
+              onClick={cancelRecording}
+              className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
+            <button 
+              onClick={handleVoiceSend}
+              className="p-3 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-all shadow-md active:scale-95 flex items-center justify-center"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSend} className="flex items-center gap-3 bg-gray-50 dark:bg-[#1a1a1a] p-2 rounded-[24px] border border-gray-100 dark:border-[#222] focus-within:ring-2 focus-within:ring-[#5A5A40]/10 dark:focus-within:ring-[#A0A080]/10 transition-all">
+            <button type="button" className="p-2 hover:bg-gray-200 dark:hover:bg-[#222] rounded-full text-gray-400 transition-colors">
+              <Smile className="w-5 h-5" />
+            </button>
+            <input
+              type="text"
+              value={input}
+              onChange={handleInputChange}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend(e as any);
+                }
+              }}
+              placeholder="Напишите сообщение..."
+              className="flex-1 bg-transparent border-none outline-none text-sm py-2 dark:text-white"
+            />
+            <div className="relative flex items-center">
+              <button 
+                type="button" 
+                onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
+                className={cn(
+                  "p-2 rounded-full transition-colors",
+                  showAttachmentMenu ? "bg-gray-200 dark:bg-[#333] text-blue-500" : "hover:bg-gray-200 dark:hover:bg-[#222] text-gray-400"
+                )}
+              >
+                <Paperclip className="w-5 h-5" />
+              </button>
+              
+              <AnimatePresence>
+                {showAttachmentMenu && (
+                  <>
+                    <div className="fixed inset-0 z-30" onClick={() => setShowAttachmentMenu(false)} />
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9, y: -10, x: -20 }}
+                      animate={{ opacity: 1, scale: 1, y: -10, x: -20 }}
+                      exit={{ opacity: 0, scale: 0.9, y: -10, x: -20 }}
+                      className="absolute bottom-full mb-2 left-0 w-48 bg-white dark:bg-[#1a1a1a] rounded-xl shadow-xl border border-gray-100 dark:border-[#333] overflow-hidden z-40"
+                    >
+                      <button 
+                        type="button"
+                        onClick={() => imageInputRef.current?.click()}
+                        className="w-full text-left px-4 py-3 text-sm flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-[#222] transition-colors"
+                      >
+                        <ImageIcon className="w-4 h-4 text-blue-500" />
+                        Фото или Видео
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full text-left px-4 py-3 text-sm flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-[#222] transition-colors"
+                      >
+                        <FileIcon className="w-4 h-4 text-purple-500" />
+                        Файл
+                      </button>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {input.trim() || isUploading ? (
+              <button 
+                type="submit" 
+                disabled={!input.trim() || isUploading}
+                className="p-3 bg-[#1a1a1a] dark:bg-[#e5e5e0] text-white dark:text-black rounded-full hover:bg-black dark:hover:bg-white disabled:opacity-50 transition-all shadow-md active:scale-95"
+              >
+                {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              </button>
+            ) : (
+              <button 
+                type="button"
+                onClick={startRecording}
+                className="p-3 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-all shadow-md active:scale-95"
+              >
+                <Mic className="w-4 h-4" />
+              </button>
+            )}
+
+            <input 
+              type="file" 
+              ref={imageInputRef} 
+              onChange={(e) => handleFileUpload(e, 'image')} 
+              accept="image/*" 
+              className="hidden" 
+            />
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={(e) => handleFileUpload(e, 'file')} 
+              className="hidden" 
+            />
+          </form>
+        )}
       </div>
     </div>
   );

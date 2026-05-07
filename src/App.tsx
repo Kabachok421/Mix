@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 
 import { Avatar } from './components/Avatar';
+import { CallManager } from './components/CallManager';
 
 export default function App() {
   const { user, profile, loading, isOffline, logout } = useAuth();
@@ -61,6 +62,7 @@ export default function App() {
 
   return (
     <div className="h-[100dvh] flex bg-[#f5f5f0] dark:bg-[#050505] overflow-hidden p-0 sm:p-4 transition-colors duration-500 font-sans">
+      <CallManager />
       <div className="flex-1 flex max-w-6xl mx-auto w-full bg-white dark:bg-[#111111] sm:rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.6)] overflow-hidden border border-[#e5e5e0] dark:border-[#222] transition-colors relative">
         
         {/* Sidebar */}
