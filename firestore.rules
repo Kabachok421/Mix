@@ -125,7 +125,7 @@ service cloud.firestore {
     match /calls/{callId} {
       allow list, get: if isSignedIn() && (resource == null || resource.data.participantIds.hasAny([request.auth.uid]));
       allow create: if isSignedIn()
-        && incoming().keys().hasAll(['participantIds', 'status', 'callerId', 'offer', 'createdAt', 'updatedAt'])
+        && incoming().keys().hasAll(['participantIds', 'status', 'callerId', 'createdAt', 'updatedAt'])
         && incoming().participantIds is list
         && request.auth.uid in incoming().participantIds
         && incoming().callerId == request.auth.uid
@@ -134,24 +134,22 @@ service cloud.firestore {
       allow update: if isSignedIn()
         && existing().participantIds.hasAny([request.auth.uid])
         && incoming().participantIds == existing().participantIds
-        && incoming().diff(existing()).affectedKeys().hasAny(['status', 'answer', 'updatedAt'])
+        && incoming().diff(existing()).affectedKeys().hasAny(['status', 'offer', 'answer', 'updatedAt'])
         && incoming().updatedAt == request.time;
-        
+      
       allow delete: if isSignedIn() && existing().participantIds.hasAny([request.auth.uid]);
       
       match /callerCandidates/{candidateId} {
         allow read: if isSignedIn() && get(/databases/$(database)/documents/calls/$(callId)).data.participantIds.hasAny([request.auth.uid]);
         allow create: if isSignedIn() 
-          && get(/databases/$(database)/documents/calls/$(callId)).data.callerId == request.auth.uid
-          && isValidId(candidateId);
+          && get(/databases/$(database)/documents/calls/$(callId)).data.callerId == request.auth.uid;
       }
       
       match /receiverCandidates/{candidateId} {
         allow read: if isSignedIn() && get(/databases/$(database)/documents/calls/$(callId)).data.participantIds.hasAny([request.auth.uid]);
         allow create: if isSignedIn() 
           && get(/databases/$(database)/documents/calls/$(callId)).data.participantIds.hasAny([request.auth.uid])
-          && get(/databases/$(database)/documents/calls/$(callId)).data.callerId != request.auth.uid
-          && isValidId(candidateId);
+          && get(/databases/$(database)/documents/calls/$(callId)).data.callerId != request.auth.uid;
       }
     }
   }
