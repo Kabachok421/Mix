@@ -6,7 +6,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Avatar } from './Avatar';
 import { UserStatus } from './UserStatus';
-import { getUserDisplayName } from '../lib/utils';
+import { UserName } from './UserName';
 
 interface UserProfileModalProps {
   user: UserProfile;
@@ -46,7 +46,7 @@ export default function UserProfileModal({ user, onClose }: UserProfileModalProp
 
         <div className="px-6 pt-16 pb-8">
           <h2 className="text-2xl font-serif text-[#1a1a1a] dark:text-white leading-tight">
-            {getUserDisplayName(user)}
+            <UserName user={user} />
           </h2>
           <div className="text-sm mt-1 capitalize-first">
             {user ? <UserStatus user={user} className="" /> : null}

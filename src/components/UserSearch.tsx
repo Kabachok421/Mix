@@ -5,7 +5,7 @@ import { UserProfile } from '../types';
 import { Search, UserPlus, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Avatar } from './Avatar';
-import { getUserDisplayName } from '../lib/utils';
+import { UserName } from './UserName';
 
 interface UserSearchProps {
   onStartChat: (chatId: string) => void;
@@ -81,7 +81,7 @@ export default function UserSearch({ onStartChat }: UserSearchProps) {
                 <div className="flex items-center gap-3">
                   <Avatar src={u.photoURL} className="w-8 h-8" />
                   <div className="text-left">
-                    <div className="text-sm font-medium dark:text-white">{getUserDisplayName(u)}</div>
+                    <div className="text-sm font-medium dark:text-white"><UserName user={u} /></div>
                     <div className="text-xs text-gray-400 dark:text-gray-500">@{u.username || 'unknown'}</div>
                   </div>
                 </div>

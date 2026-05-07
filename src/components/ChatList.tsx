@@ -3,7 +3,8 @@ import { useAuth } from '../hooks/useAuth';
 import { chatService } from '../services/chatService';
 import { Chat, UserProfile } from '../types';
 import { motion } from 'motion/react';
-import { cn, getUserDisplayName } from '../lib/utils';
+import { cn } from '../lib/utils';
+import { UserName } from './UserName';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 
@@ -79,7 +80,7 @@ export default function ChatList({ onSelectChat, activeChatId }: ChatListProps) 
                 <div className="flex-1 text-left min-w-0">
                   <div className="flex justify-between items-baseline mb-1">
                     <h3 className="font-medium text-[#1a1a1a] dark:text-white truncate">
-                      {otherUser ? getUserDisplayName(otherUser) : 'Загрузка...'}
+                      {otherUser ? <UserName user={otherUser} /> : 'Загрузка...'}
                     </h3>
                     <span className="text-[10px] text-gray-400 dark:text-gray-600 font-sans uppercase">
                       {chat.updatedAt && format(chat.updatedAt.toDate(), 'HH:mm', { locale: ru })}

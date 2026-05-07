@@ -12,6 +12,7 @@ import { cn } from './lib/utils';
 
 import { Avatar } from './components/Avatar';
 import { CallManager } from './components/CallManager';
+import { UserName } from './components/UserName';
 
 export default function App() {
   const { user, profile, loading, isOffline, logout } = useAuth();
@@ -100,7 +101,9 @@ export default function App() {
                 className="w-9 h-9 border border-white dark:border-[#333] shadow-sm group-hover:opacity-80 group-hover:bg-gray-300 dark:group-hover:bg-[#444] transition-all" 
               />
               <div className="text-left overflow-hidden">
-                <p className="text-sm font-medium text-[#1a1a1a] dark:text-white truncate">{profile?.displayName || user.displayName}</p>
+                <p className="text-sm font-medium text-[#1a1a1a] dark:text-white truncate">
+                  <UserName user={profile || user} fallback={user.displayName} />
+                </p>
                 <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate">@{profile?.username}</p>
               </div>
             </div>

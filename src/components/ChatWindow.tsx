@@ -5,6 +5,7 @@ import { Chat, Message, UserProfile } from '../types';
 import { Send, Smile, Paperclip, MoreVertical, MessageSquare, Trash2, ChevronLeft, Mic, X, Image as ImageIcon, File as FileIcon, Loader2, Video } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, getUserDisplayName, formatLastSeen } from '../lib/utils';
+import { UserName } from './UserName';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import UserProfileModal from './UserProfileModal';
@@ -207,7 +208,9 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
             className="w-10 h-10 border border-gray-100 dark:border-[#333] shadow-sm group-hover:opacity-80 transition-opacity flex-shrink-0" 
           />
           <div className="flex-1 min-w-0">
-            <h2 className="font-medium text-[#1a1a1a] dark:text-white transition-colors truncate">{otherUser ? getUserDisplayName(otherUser) : 'Переписка'}</h2>
+            <h2 className="font-medium text-[#1a1a1a] dark:text-white transition-colors truncate">
+              {otherUser ? <UserName user={otherUser} /> : 'Переписка'}
+            </h2>
             <AnimatePresence mode="wait">
               {isOtherTyping ? (
                 <motion.p 
@@ -311,7 +314,11 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                   isMe ? "self-end items-end" : "self-start items-start"
                 )}
               >
-                {!isMe && <span className="text-[10px] text-gray-400 dark:text-gray-600 ml-2 uppercase font-sans">{otherUser ? getUserDisplayName(otherUser) : msg.senderName}</span>}
+                {!isMe && (
+                  <span className="text-[10px] text-gray-400 dark:text-gray-600 ml-2 uppercase font-sans">
+                    {otherUser ? <UserName user={otherUser} fallback={msg.senderName} /> : msg.senderName}
+                  </span>
+                )}
                 <div
                   className={cn(
                     "px-4 py-2.5 rounded-2xl shadow-sm text-sm relative transition-all duration-300",
