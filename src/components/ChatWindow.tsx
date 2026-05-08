@@ -39,15 +39,20 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
   const { isRecording, duration, startRecording, stopRecording, cancelRecording } = useVoiceRecorder();
 
   const handleDeleteChat = async () => {
-    if (window.confirm('Вы уверены, что хотите удалить этого пользователя из друзей (удалить чат)? Это действие нельзя отменить.')) {
+    // Custom confirmation can be added here later, for now we delete directly as iframe blocks confirm.
+    try {
       await chatService.deleteChat(chatId);
       if (onClose) onClose();
+    } catch (e) {
+      console.error('Failed to delete chat:', e);
     }
   };
 
   const handleDeleteMessage = async (messageId: string) => {
-    if (window.confirm('Удалить это сообщение?')) {
+    try {
       await chatService.deleteMessage(chatId, messageId);
+    } catch (e) {
+      console.error('Failed to delete message:', e);
     }
   };
 
