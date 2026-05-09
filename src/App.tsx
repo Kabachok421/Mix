@@ -162,9 +162,9 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm bg-white dark:bg-[#1a1a1a] rounded-[32px] shadow-2xl z-[101] overflow-hidden border border-[#e5e5e0] dark:border-[#333]"
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] max-w-sm md:max-w-4xl max-h-[90vh] flex flex-col bg-white dark:bg-[#1a1a1a] rounded-[32px] shadow-2xl z-[101] overflow-hidden border border-[#e5e5e0] dark:border-[#333]"
             >
-              <div className="p-6 border-b border-gray-100 dark:border-[#222] flex items-center justify-between">
+              <div className="p-6 border-b border-gray-100 dark:border-[#222] flex items-center justify-between shrink-0">
                 <h3 className="text-xl font-serif dark:text-white">Настройки</h3>
                 <button 
                   onClick={() => setShowSettings(false)}
@@ -173,51 +173,59 @@ export default function App() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="p-6 space-y-6">
-                <div className="space-y-4">
-                  <h4 className="text-sm font-medium mb-2 dark:text-white">Тема оформления</h4>
-                  <div className="grid grid-cols-3 gap-2">
-                    <button 
-                      onClick={() => setTheme('light')}
-                      className={cn(
-                        "flex flex-col items-center justify-center p-3 rounded-xl border transition-all",
-                        theme === 'light' ? "border-[#5A5A40] bg-gray-50" : "border-gray-200 hover:bg-gray-50 dark:border-[#333] dark:hover:bg-[#1a1a1a]"
-                      )}
-                    >
-                      <Sun className="w-5 h-5 mb-2 text-orange-500" />
-                      <span className="text-xs font-medium dark:text-gray-300">Светлая</span>
-                    </button>
-                    
-                    <button 
-                      onClick={() => setTheme('dark')}
-                      className={cn(
-                        "flex flex-col items-center justify-center p-3 rounded-xl border transition-all",
-                        theme === 'dark' ? "border-gray-400 bg-gray-800 text-white" : "border-gray-200 dark:border-[#333] hover:bg-gray-100 dark:hover:bg-[#1a1a1a]"
-                      )}
-                    >
-                      <Moon className="w-5 h-5 mb-2 text-blue-400" />
-                      <span className="text-xs font-medium dark:text-gray-300">Тёмная</span>
-                    </button>
-                    
-                    <button 
-                      onClick={() => setTheme('ocean')}
-                      className={cn(
-                        "flex flex-col items-center justify-center p-3 rounded-xl border transition-all",
-                        theme === 'ocean' ? "border-cyan-400 bg-[#041f2e] text-white shadow-[0_0_10px_rgba(0,255,255,0.2)]" : "border-gray-200 dark:border-[#333] hover:bg-gray-100 dark:hover:bg-[#1a1a1a]"
-                      )}
-                    >
-                      <div className="w-5 h-5 mb-2 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 shadow-[0_0_8px_rgba(0,255,255,0.5)]" />
-                      <span className="text-xs font-medium dark:text-gray-300">Ocean</span>
-                    </button>
+              <div className="p-6 overflow-y-auto flex-1 flex flex-col md:flex-row gap-8">
+                {/* Левая колонка - настройки приложения */}
+                <div className="flex-1 space-y-6 flex flex-col">
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-medium mb-4 dark:text-white">Тема оформления</h4>
+                    <div className="flex flex-row md:flex-col gap-3">
+                      <button 
+                        onClick={() => setTheme('light')}
+                        className={cn(
+                          "flex flex-col md:flex-row items-center justify-center md:justify-start p-3 rounded-2xl border transition-all flex-1 md:flex-none text-center md:text-left",
+                          theme === 'light' ? "border-[#5A5A40] bg-gray-50" : "border-gray-200 hover:bg-gray-50 dark:border-[#333] dark:hover:bg-[#1a1a1a]"
+                        )}
+                      >
+                        <Sun className="w-5 h-5 text-orange-500 mr-0 md:mr-3 mb-2 md:mb-0" />
+                        <span className="text-xs md:text-sm font-medium dark:text-gray-300">Светлая</span>
+                      </button>
+                      
+                      <button 
+                        onClick={() => setTheme('dark')}
+                        className={cn(
+                          "flex flex-col md:flex-row items-center justify-center md:justify-start p-3 rounded-2xl border transition-all flex-1 md:flex-none text-center md:text-left",
+                          theme === 'dark' ? "border-gray-400 bg-gray-800 text-white" : "border-gray-200 dark:border-[#333] hover:bg-gray-100 dark:hover:bg-[#1a1a1a]"
+                        )}
+                      >
+                        <Moon className="w-5 h-5 text-blue-400 mr-0 md:mr-3 mb-2 md:mb-0" />
+                        <span className="text-xs md:text-sm font-medium dark:text-gray-300">Тёмная</span>
+                      </button>
+                      
+                      <button 
+                        onClick={() => setTheme('ocean')}
+                        className={cn(
+                          "flex flex-col md:flex-row items-center justify-center md:justify-start p-3 rounded-2xl border transition-all flex-1 md:flex-none text-center md:text-left",
+                          theme === 'ocean' ? "border-cyan-400 bg-[#041f2e] text-white shadow-[0_0_10px_rgba(0,255,255,0.2)]" : "border-gray-200 dark:border-[#333] hover:bg-gray-100 dark:hover:bg-[#1a1a1a]"
+                        )}
+                      >
+                        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 shadow-[0_0_8px_rgba(0,255,255,0.5)] mr-0 md:mr-3 mb-2 md:mb-0" />
+                        <span className="text-xs md:text-sm font-medium dark:text-gray-300">Ocean</span>
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="hidden md:block mt-auto pt-8">
+                    <p className="text-[10px] text-gray-400 uppercase tracking-widest">Mix Messenger v1.1</p>
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-gray-100 dark:border-[#222]">
-                  <h4 className="text-sm font-medium mb-4 dark:text-white">Редактировать профиль</h4>
+                {/* Правая колонка - профиль */}
+                <div className="flex-[1.5] md:border-l md:border-t-0 border-t border-gray-100 dark:border-[#222] pt-6 md:pt-0 md:pl-8">
+                  <h4 className="text-sm font-medium mb-6 dark:text-white">Редактировать профиль</h4>
                   <SetupProfile onComplete={() => setShowSettings(false)} fullPage={false} />
                 </div>
 
-                <div className="pt-4 border-t border-gray-100 dark:border-[#222]">
+                <div className="md:hidden mt-4 pt-4 border-t border-gray-100 dark:border-[#222]">
                   <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center">Mix Messenger v1.1</p>
                 </div>
               </div>

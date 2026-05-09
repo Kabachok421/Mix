@@ -9,6 +9,9 @@ export function useVoiceRecorder() {
 
   const startRecording = useCallback(async () => {
     try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Ваш браузер блокирует доступ к микрофону внутри iframe. Пожалуйста, откройте приложение в новой вкладке (кнопка справа вверху).");
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
@@ -29,7 +32,8 @@ export function useVoiceRecorder() {
       }, 1000);
     } catch (err) {
       console.warn('Error accessing microphone:', err);
-      alert('Микрофон недоступен. Убедитесь, что вы разрешили доступ к микрофону, или откройте приложение в новой вкладке.');
+      // @ts-ignore
+      alert(`Микрофон недоступен: ${err.name || err.message || err}. Убедитесь, что вы разрешили доступ к микрофону, или откройте приложение в новой вкладке.`);
     }
   }, []);
 

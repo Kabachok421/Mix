@@ -39,6 +39,9 @@ export function CallScreen({ callId, isCaller, onClose }: { callId: string; isCa
 
     const initCall = async () => {
       try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("Ваш браузер блокирует доступ к медиаустройствам внутри iframe. Пожалуйста, откройте приложение в новой вкладке (кнопка в правом верхнем углу).");
+        }
         lStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         setLocalStream(lStream);
         if (localVideoRef.current) localVideoRef.current.srcObject = lStream;
@@ -72,7 +75,8 @@ export function CallScreen({ callId, isCaller, onClose }: { callId: string; isCa
         }
       } catch (e) {
         console.warn("Error accessing media devices", e);
-        alert("Не удалось получить доступ к камере или микрофону. Убедитесь, что вы предоставили разрешения, или откройте приложение в новой вкладке.");
+        // @ts-ignore
+        alert(`Не удалось получить доступ к камере или микрофону (${e.name || e.message || e}). Убедитесь, что вы предоставили разрешения, или откройте приложение в новой вкладке.`);
         endCall();
       }
     };
