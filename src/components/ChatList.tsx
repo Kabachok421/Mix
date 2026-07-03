@@ -16,6 +16,8 @@ interface ChatListProps {
 import { Avatar } from './Avatar';
 import { UserStatus } from './UserStatus';
 
+import ChatListItem from './ChatListItem';
+
 export default function ChatList({ onSelectChat, activeChatId }: ChatListProps) {
   const { user } = useAuth();
   const [chats, setChats] = useState<Chat[]>([]);
@@ -61,37 +63,13 @@ export default function ChatList({ onSelectChat, activeChatId }: ChatListProps) 
             const otherUser = otherUserId ? participantsMap[otherUserId] : null;
 
             return (
-              <button
+              <ChatListItem
                 key={chat.id}
+                chat={chat}
+                otherUser={otherUser}
+                isActive={activeChatId === chat.id}
                 onClick={() => onSelectChat(chat.id)}
-                className={cn(
-                  "flex items-center gap-4 p-4 transition-all border-b border-gray-100/50 dark:border-gray-800/30 hover:bg-gray-50 dark:hover:bg-[#1a1a1a]",
-                  activeChatId === chat.id && "bg-white dark:bg-[#1a1a1a] shadow-[0_4px_15px_rgba(0,0,0,0.05)] dark:shadow-[0_4px_25px_rgba(0,0,0,0.3)] z-10 border-transparent"
-                )}
-              >
-                <div className="relative">
-                  <Avatar 
-                    src={otherUser?.photoURL} 
-                    className="w-12 h-12" 
-                  />
-                  {otherUser && <UserStatus user={otherUser} showDotOnly />}
-                </div>
-                
-                <div className="flex-1 text-left min-w-0">
-                  <div className="flex justify-between items-baseline mb-1">
-                    <h3 className="font-medium text-[#1a1a1a] dark:text-white truncate">
-                      {otherUser ? <UserName user={otherUser} /> : 'Загрузка...'}
-                    </h3>
-                    <span className="text-[10px] text-gray-400 dark:text-gray-600 font-sans uppercase">
-                      {chat.updatedAt && format(chat.updatedAt.toDate(), 'HH:mm', { locale: ru })}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-400 truncate font-light italic">
-                    {chat.lastMessageSenderId === user?.uid ? 'Вы: ' : ''}
-                    {chat.lastMessage}
-                  </p>
-                </div>
-              </button>
+              />
             );
           })}
         </div>

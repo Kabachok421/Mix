@@ -148,6 +148,16 @@ export const chatService = {
     }
   },
 
+  getAllUsers: async () => {
+    try {
+      const q = query(collection(db, 'users'), limit(500));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile));
+    } catch (error) {
+      handleFirestoreError(error, 'list', 'users');
+    }
+  },
+
   // Subscribe to user profile (status, lastSeen, etc)
   subscribeToUserProfile: (userId: string, callback: (profile: UserProfile | null) => void) => {
     const docRef = doc(db, 'users', userId);

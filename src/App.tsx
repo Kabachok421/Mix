@@ -6,7 +6,8 @@ import ChatList from './components/ChatList';
 import ChatWindow from './components/ChatWindow';
 import UserSearch from './components/UserSearch';
 import SetupProfile from './components/SetupProfile';
-import { LogOut, MessageSquare, Settings, User as UserIcon, Moon, Sun, X } from 'lucide-react';
+import AdminPanel from './components/AdminPanel';
+import { LogOut, MessageSquare, Settings, User as UserIcon, Moon, Sun, X, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 
@@ -19,10 +20,13 @@ export default function App() {
   const { theme, setTheme } = useTheme();
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'profile' | 'admin'>('profile');
+  
+  const isAdmin = user?.email === 'kko593764@gmail.com';
 
   if (loading) {
     return (
-      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-[#f5f5f0] dark:bg-[#0a0a0a] transition-colors duration-500">
+      <div className="fixed inset-0 flex flex-col items-center justify-center bg-[#f5f5f0] dark:bg-[#0a0a0a] transition-colors duration-500">
         <div className="relative flex items-center justify-center">
           <motion.div 
             animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
@@ -55,14 +59,14 @@ export default function App() {
 
   if (!profile || !profile.username) {
     return (
-      <div className="h-[100dvh] flex bg-[#f5f5f0] dark:bg-[#050505] p-0 sm:p-4 transition-colors duration-500 font-sans">
+      <div className="fixed inset-0 flex bg-[#f5f5f0] dark:bg-[#050505] p-0 sm:p-4 transition-colors duration-500 font-sans">
         <SetupProfile />
       </div>
     );
   }
 
   return (
-    <div className="h-[100dvh] flex bg-[#f5f5f0] dark:bg-[#050505] overflow-hidden p-0 sm:p-4 transition-colors duration-500 font-sans">
+    <div className="fixed inset-0 flex bg-[#f5f5f0] dark:bg-[#050505] overflow-hidden p-0 sm:p-4 transition-colors duration-500 font-sans">
       <CallManager />
       <div className="flex-1 flex max-w-6xl mx-auto w-full bg-white dark:bg-[#111111] sm:rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.6)] overflow-hidden border border-[#e5e5e0] dark:border-[#222] transition-colors relative">
         
@@ -215,17 +219,47 @@ export default function App() {
                   </div>
                   
                   <div className="hidden md:block mt-auto pt-8">
-                    <p className="text-[10px] text-gray-400 uppercase tracking-widest">Mix Messenger v1.1</p>
+                    {isAdmin && (
+                      <button
+                        onClick={() => setActiveSettingsTab(activeSettingsTab === 'admin' ? 'profile' : 'admin')}
+                        className={cn(
+                          "w-full flex items-center justify-center p-3 rounded-xl border transition-all mb-4 text-sm font-medium",
+                          activeSettingsTab === 'admin' ? "bg-[#5A5A40] text-white border-transparent dark:bg-[#A0A080] dark:text-[#1a1a1a]" : "border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-[#333] dark:text-gray-300 dark:hover:bg-[#1a1a1a]"
+                        )}
+                      >
+                        <Shield className="w-4 h-4 mr-2" />
+                        {activeSettingsTab === 'admin' ? 'Вернуться в профиль' : 'Админ-панель'}
+                      </button>
+                    )}
+                    <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center md:text-left">Mix Messenger v1.1</p>
                   </div>
                 </div>
 
-                {/* Правая колонка - профиль */}
+                {/* Правая колонка - профиль / админка */}
                 <div className="flex-[1.5] md:border-l md:border-t-0 border-t border-gray-100 dark:border-[#222] pt-6 md:pt-0 md:pl-8">
-                  <h4 className="text-sm font-medium mb-6 dark:text-white">Редактировать профиль</h4>
-                  <SetupProfile onComplete={() => setShowSettings(false)} fullPage={false} />
+                  {activeSettingsTab === 'admin' && isAdmin ? (
+                    <AdminPanel />
+                  ) : (
+                    <>
+                      <h4 className="text-sm font-medium mb-6 dark:text-white">Редактировать профиль</h4>
+                      <SetupProfile onComplete={() => setShowSettings(false)} fullPage={false} />
+                    </>
+                  )}
                 </div>
 
                 <div className="md:hidden mt-4 pt-4 border-t border-gray-100 dark:border-[#222]">
+                  {isAdmin && (
+                    <button
+                      onClick={() => setActiveSettingsTab(activeSettingsTab === 'admin' ? 'profile' : 'admin')}
+                      className={cn(
+                        "w-full flex items-center justify-center p-3 rounded-xl border transition-all mb-4 text-sm font-medium",
+                        activeSettingsTab === 'admin' ? "bg-[#5A5A40] text-white border-transparent dark:bg-[#A0A080] dark:text-[#1a1a1a]" : "border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-[#333] dark:text-gray-300 dark:hover:bg-[#1a1a1a]"
+                      )}
+                    >
+                      <Shield className="w-4 h-4 mr-2" />
+                      {activeSettingsTab === 'admin' ? 'Профиль' : 'Админ-панель'}
+                    </button>
+                  )}
                   <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center">Mix Messenger v1.1</p>
                 </div>
               </div>

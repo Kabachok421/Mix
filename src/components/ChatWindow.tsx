@@ -14,6 +14,7 @@ import { UserStatus } from './UserStatus';
 import { useVoiceRecorder } from '../hooks/useVoiceRecorder';
 import { VoiceMessage } from './VoiceMessage';
 import { FileMessage } from './FileMessage';
+import TypingIndicator from './TypingIndicator';
 import { callService } from '../services/callService';
 
 interface ChatWindowProps {
@@ -215,15 +216,20 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
             </h2>
             <AnimatePresence mode="wait">
               {isOtherTyping ? (
-                <motion.p 
+                <motion.div 
                   key="typing"
                   initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -5 }}
-                  className="text-[10px] text-[#5A5A40] dark:text-orange-400/80 uppercase tracking-widest font-sans font-bold italic"
+                  className="text-[13px] text-blue-500 font-sans font-medium italic flex items-center gap-1"
                 >
-                  печaтaет...
-                </motion.p>
+                  <span className="text-[10px] text-blue-500 dark:text-blue-400 uppercase tracking-widest font-sans font-bold italic">печатает</span>
+                  <span className="flex gap-[2px] mt-1">
+                    <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0 }} className="w-1 h-1 bg-blue-500 dark:bg-blue-400 rounded-full" />
+                    <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1 h-1 bg-blue-500 dark:bg-blue-400 rounded-full" />
+                    <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1 h-1 bg-blue-500 dark:bg-blue-400 rounded-full" />
+                  </span>
+                </motion.div>
               ) : (
                 <motion.div 
                   key="status"
@@ -357,6 +363,16 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
               </motion.div>
             )
           })
+        )}
+        {isOtherTyping && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="flex justify-start mt-2 mb-4"
+          >
+            <TypingIndicator />
+          </motion.div>
         )}
         <div ref={scrollRef} />
       </div>

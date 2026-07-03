@@ -19,6 +19,8 @@ export default function Login() {
         setError('Этот домен не авторизован в Firebase. Добавьте его в Authorized Domains в консоли Firebase.');
       } else if (err.code === 'auth/network-request-failed') {
         setError('Сетевая ошибка или блокировка. Если вы находитесь в режиме предпросмотра (iframe) или включена защита от отслеживания (Tracking Prevention), браузер мог заблокировать доступ к хранилищу. Пожалуйста, откройте приложение в новой вкладке (Open in new tab) или отключите блокировщики в браузере.');
+      } else if (err.code === 'auth/popup-blocked') {
+        setError('Браузер заблокировал всплывающее окно для входа. Пожалуйста, разрешите всплывающие окна для этого сайта или откройте приложение в новой вкладке (кнопка справа вверху).');
       } else {
         setError(err.message || 'Произошла ошибка при входе. Проверьте консоль браузера.');
       }
@@ -27,8 +29,10 @@ export default function Login() {
     }
   };
 
+  const isIframe = window !== window.top;
+
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center bg-[#f5f5f0] dark:bg-[#0a0a0a] p-4 transition-colors duration-500">
+    <div className="fixed inset-0 flex items-center justify-center bg-[#f5f5f0] dark:bg-[#0a0a0a] p-4 transition-colors duration-500 overflow-y-auto">
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -42,6 +46,19 @@ export default function Login() {
         <h1 className="text-4xl font-serif font-light text-[#1a1a1a] dark:text-white mb-2">Mix</h1>
         <p className="text-[#5A5A40] dark:text-[#A0A080] font-light mb-8 italic">Связь в новом измерении</p>
         
+        {isIframe && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-100 dark:border-yellow-900/30 rounded-2xl text-xs text-yellow-800 dark:text-yellow-400"
+          >
+            В режиме предпросмотра могут возникать ошибки при входе. Пожалуйста, откройте приложение в новой вкладке.
+            <a href={window.location.href} target="_blank" rel="noopener noreferrer" className="block mt-2 font-bold underline">
+              Открыть в новой вкладке
+            </a>
+          </motion.div>
+        )}
+
         {error && (
           <motion.div 
             initial={{ opacity: 0, y: -10 }}
