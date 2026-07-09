@@ -71,7 +71,7 @@ export const callService = {
       } else {
         callback(null);
       }
-    });
+    }, (error) => console.warn('Incoming calls listener error:', error));
   },
 
   subscribeToCall: (callId: string, callback: (call: Call) => void) => {
@@ -80,7 +80,7 @@ export const callService = {
       if (doc.exists()) {
         callback({ id: doc.id, ...doc.data() } as Call);
       }
-    });
+    }, (error) => console.warn('Call listener error:', error));
   },
 
   subscribeToCandidates: (callId: string, role: 'caller' | 'receiver', callback: (candidate: any) => void) => {
@@ -93,7 +93,7 @@ export const callService = {
           callback(change.doc.data());
         }
       });
-    });
+    }, (error) => console.warn('Candidates listener error:', error));
   },
   
   endCall: async (callId: string) => {

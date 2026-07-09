@@ -69,6 +69,9 @@ class FileTransferService {
           unsubscribe();
           reject(new Error('Отправка отменена или не удалась'));
         }
+      }, (error) => {
+        unsubscribe();
+        reject(error);
       });
     });
   }
@@ -131,6 +134,8 @@ class FileTransferService {
           }
         }
       });
+    }, (error) => {
+      console.warn("Transfer listener error:", error);
     });
   }
 

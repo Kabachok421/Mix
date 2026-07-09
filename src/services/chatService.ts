@@ -249,6 +249,8 @@ export const chatService = {
       } else {
         callback(false);
       }
+    }, (error) => {
+      console.warn("Typing listener error:", error);
     });
   },
 
