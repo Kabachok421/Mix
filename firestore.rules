@@ -108,6 +108,11 @@ service cloud.firestore {
       allow delete: if isSignedIn() && existing().senderId == request.auth.uid;
     }
 
+    
+    match /chats/{chatId}/transfers/{transferId} {
+      allow read, write: if isSignedIn() && get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds.hasAny([request.auth.uid]);
+    }
+
     match /chats/{chatId}/typing/{userId} {
       // Any participant can read typing status
       allow read: if isSignedIn() 
