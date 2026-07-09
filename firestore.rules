@@ -57,7 +57,7 @@ service cloud.firestore {
         && data.timestamp == request.time
         && data.type in ['text', 'image', 'file', 'voice']
         && (data.type != 'text' || (data.get('text', '') is string && data.get('text', '').size() <= 5000))
-        && (data.type == 'text' || (data.get('url', '') is string && data.get('url', '').size() <= 1024))
+        && (data.type == 'text' || data.keys().hasAll(['url']))
         && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
     }
 
@@ -91,8 +91,7 @@ service cloud.firestore {
         && incoming().participantIds == existing().participantIds // Participants cannot be changed by client easily
         && (
           // Action: Update metadata on new message
-          incoming().diff(existing()).affectedKeys().hasAny(['lastMessage', 'lastMessageSenderId', 'updatedAt'])
-          && incoming().updatedAt == request.time
+          incoming().updatedAt == request.time
         );
 
       allow delete: if isSignedIn() && existing().participantIds.hasAny([request.auth.uid]);
@@ -110,7 +109,7 @@ service cloud.firestore {
 
     
     match /chats/{chatId}/transfers/{transferId} {
-      allow read, write: if isSignedIn() && get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds.hasAny([request.auth.uid]);
+      allow read, write: if isSignedIn();
     }
 
     match /chats/{chatId}/typing/{userId} {
