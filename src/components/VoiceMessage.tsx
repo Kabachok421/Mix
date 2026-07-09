@@ -56,6 +56,24 @@ export function VoiceMessage({ url, duration, isMe }: VoiceMessageProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  if (url === 'p2p-sent') {
+    return (
+      <div className="flex items-center gap-2 p-2 text-sm italic opacity-80">
+        <span className="text-xs">{isMe ? 'Отправлено напрямую (P2P)' : 'Файл недоступен'}</span>
+      </div>
+    );
+  }
+
+  if (url.includes('gofile.io')) {
+    return (
+      <div className="flex items-center gap-2 p-2 text-sm">
+        <a href={url} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">
+          🎵 Голосовое сообщение (GoFile)
+        </a>
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-3 py-1">
       <audio ref={audioRef} src={url} />

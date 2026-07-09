@@ -14,12 +14,7 @@ import {
   deleteDoc,
   limit
 } from 'firebase/firestore';
-import { 
-  ref, 
-  uploadBytes, 
-  getDownloadURL 
-} from 'firebase/storage';
-import { db, storage, handleFirestoreError } from '../lib/firebase';
+import { db, handleFirestoreError } from '../lib/firebase';
 import { Chat, Message, UserProfile } from '../types';
 
 export const chatService = {
@@ -57,14 +52,51 @@ export const chatService = {
     }, (error) => handleFirestoreError(error, 'list', `chats/${chatId}/messages`));
   },
   
-  // Upload file
-  uploadFile: async (path: string, file: Blob | File) => {
+  // Upload file (using GoFile for free large file storage when user is offline)
+  uploadFile: async (path: string, file: Blob | File, onProgress?: (progress: number) => void) => {
     try {
-      const storageRef = ref(storage, path);
-      await uploadBytes(storageRef, file);
-      return await getDownloadURL(storageRef);
+      const serverRes = await fetch('https://api.gofile.io/servers');
+      const serverData = await serverRes.json();
+      if (serverData.status !== 'ok') throw new Error('Не удалось получить сервер GoFile');
+      const server = serverData.data.servers[0].name;
+
+      const formData = new FormData();
+      formData.append('file', file, (file as File).name || 'voice.webm');
+
+      return new Promise<string>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `https://${server}.gofile.io/contents/uploadfile`, true);
+
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable && onProgress) {
+            const progress = (event.loaded / event.total) * 100;
+            onProgress(progress);
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const res = JSON.parse(xhr.responseText);
+              if (res.status === 'ok') {
+                resolve(res.data.downloadPage);
+              } else {
+                reject(new Error('GoFile error: ' + res.status));
+              }
+            } catch (e) {
+              reject(e);
+            }
+          } else {
+            reject(new Error('Upload failed with status ' + xhr.status));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error('Network error during upload'));
+        
+        xhr.send(formData);
+      });
     } catch (error) {
-      console.error('File upload error:', error);
+      console.error("GoFile upload error:", error);
       throw error;
     }
   },

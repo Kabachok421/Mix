@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { chatService } from '../services/chatService';
+import { fileTransferService } from '../services/fileTransferService';
 import { Chat, Message, UserProfile } from '../types';
 import { Send, Smile, Paperclip, MoreVertical, MessageSquare, Trash2, ChevronLeft, Mic, X, Image as ImageIcon, File as FileIcon, Loader2, Video } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -37,6 +38,8 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
   
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [p2pFiles, setP2pFiles] = useState<Record<string, string>>({});
   const { isRecording, duration, startRecording, stopRecording, cancelRecording } = useVoiceRecorder();
 
   const handleDeleteChat = async () => {
@@ -81,11 +84,24 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
       });
     }
 
+    // Subscribe to incoming P2P transfers
+    const unsubscribeTransfers = fileTransferService.subscribeToIncomingTransfers(chatId, user.uid, (transferId, meta) => {
+      fileTransferService.acceptTransfer(chatId, transferId, meta.offer, (progress) => {
+         setUploadProgress(Math.round(progress));
+         setIsUploading(true);
+      }, (url, name) => {
+         setIsUploading(false);
+         setUploadProgress(0);
+         setP2pFiles(prev => ({ ...prev, [name]: url }));
+      }).catch(console.error);
+    });
+
     return () => {
       unsubscribeMessages();
       if (unsubscribeProfile) unsubscribeProfile();
       if (unsubscribeTyping) unsubscribeTyping();
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      unsubscribeTransfers();
     };
   }, [chatId, user]);
 
@@ -130,10 +146,27 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
 
     try {
       setIsUploading(true);
+      setUploadProgress(0);
       setShowAttachmentMenu(false);
 
-      const path = `chats/${chatId}/${Date.now()}_${file.name}`;
-      const url = await chatService.uploadFile(path, file);
+      let finalUrl = '';
+      
+      // Use P2P if the other user is online, otherwise use GoFile
+      if (otherUser?.status === 'online') {
+        if (file.size > 2 * 1024 * 1024 * 1024) {
+           throw new Error("Максимальный размер файла для прямой передачи - 2 ГБ.");
+        }
+        await fileTransferService.initiateTransfer(chatId, user.uid, otherUser.uid, file, (progress) => {
+           setUploadProgress(Math.round(progress));
+        });
+        
+        finalUrl = 'p2p-sent';
+      } else {
+        const path = `chats/${chatId}/${Date.now()}_${file.name}`;
+        finalUrl = await chatService.uploadFile(path, file, (progress) => {
+          setUploadProgress(Math.round(progress));
+        });
+      }
 
       await chatService.sendMessage(
         chatId, 
@@ -141,16 +174,17 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
         getUserDisplayName(profile as UserProfile) || user.displayName || 'Anonymous', 
         { 
           type, 
-          url, 
+          url: finalUrl, 
           fileName: file.name, 
           fileSize: file.size 
         }
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error('File upload failed:', error);
-      alert('Ошибка при загрузке файла');
+      alert(error.message || 'Ошибка при загрузке файла');
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
       if (e.target) e.target.value = '';
     }
   };
@@ -161,8 +195,23 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
 
     try {
       setIsUploading(true);
-      const path = `chats/${chatId}/voice_${Date.now()}.webm`;
-      const url = await chatService.uploadFile(path, recording.blob);
+      setUploadProgress(0);
+      
+      let finalUrl = '';
+      const fileName = `voice_${Date.now()}.webm`;
+      
+      if (otherUser?.status === 'online') {
+         const file = new File([recording.blob], fileName, { type: recording.blob.type });
+         await fileTransferService.initiateTransfer(chatId, user.uid, otherUser.uid, file, (progress) => {
+            setUploadProgress(Math.round(progress));
+         });
+         finalUrl = 'p2p-sent';
+      } else {
+         const path = `chats/${chatId}/${fileName}`;
+         finalUrl = await chatService.uploadFile(path, recording.blob, (progress) => {
+           setUploadProgress(Math.round(progress));
+         });
+      }
 
       await chatService.sendMessage(
         chatId, 
@@ -170,12 +219,13 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
         getUserDisplayName(profile as UserProfile) || user.displayName || 'Anonymous', 
         { 
           type: 'voice', 
-          url, 
+          url: finalUrl, 
+          fileName,
           duration: recording.duration 
         }
       );
-    } catch (error) {
-      alert('Ошибка при отправке голосового сообщения');
+    } catch (error: any) {
+      alert(error.message || 'Ошибка при отправке голосового сообщения');
     } finally {
       setIsUploading(false);
     }
@@ -337,9 +387,16 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                   )}
                 >
                   {msg.type === 'voice' ? (
-                    <VoiceMessage url={msg.url!} duration={msg.duration} isMe={isMe} />
+                    <VoiceMessage url={msg.url === 'p2p-sent' ? p2pFiles[msg.fileName || ''] || 'p2p-sent' : msg.url!} duration={msg.duration} isMe={isMe} />
                   ) : msg.type === 'image' || msg.type === 'file' ? (
-                    <FileMessage type={msg.type} url={msg.url!} fileName={msg.fileName} fileSize={msg.fileSize} isMe={isMe} />
+                    msg.url === 'p2p-sent' && !p2pFiles[msg.fileName || ''] ? (
+                      <div className="flex items-center gap-2 p-2 text-sm italic opacity-80">
+                         <FileIcon className="w-4 h-4" />
+                         <span>{isMe ? 'Файл отправлен напрямую (P2P)' : 'Файл недоступен (прямая передача)'}</span>
+                      </div>
+                    ) : (
+                      <FileMessage type={msg.type} url={msg.url === 'p2p-sent' ? p2pFiles[msg.fileName || ''] : msg.url!} fileName={msg.fileName} fileSize={msg.fileSize} isMe={isMe} />
+                    )
                   ) : (
                     msg.text
                   )}
@@ -380,12 +437,12 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
       {/* Input */}
       <div className="p-4 bg-white dark:bg-[#0d0d0d] border-t border-gray-100 dark:border-[#222] transition-colors relative">
         {isUploading && (
-          <div className="absolute top-0 left-0 right-0 h-1 bg-blue-500 overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gray-100 dark:bg-gray-800 overflow-hidden">
             <motion.div 
-              initial={{ x: "-100%" }}
-              animate={{ x: "100%" }}
-              transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-              className="h-full bg-blue-300"
+              initial={{ width: 0 }}
+              animate={{ width: `${Math.max(uploadProgress, 5)}%` }}
+              transition={{ duration: 0.3 }}
+              className="h-full bg-blue-500"
             />
           </div>
         )}
@@ -491,10 +548,19 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
             {input.trim() || isUploading ? (
               <button 
                 type="submit" 
-                disabled={!input.trim() || isUploading}
-                className="p-3 bg-[#1a1a1a] dark:bg-[#e5e5e0] text-white dark:text-black rounded-full hover:bg-black dark:hover:bg-white disabled:opacity-50 transition-all shadow-md active:scale-95"
+                disabled={!input.trim() && !isUploading}
+                className={cn(
+                  "p-3 rounded-full transition-all shadow-md active:scale-95 flex items-center justify-center gap-1 min-w-[44px]",
+                  isUploading 
+                    ? "bg-gray-100 text-gray-500 cursor-not-allowed" 
+                    : "bg-[#1a1a1a] dark:bg-[#e5e5e0] text-white dark:text-black hover:bg-black dark:hover:bg-white disabled:opacity-50"
+                )}
               >
-                {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                {isUploading ? (
+                  <span className="text-xs font-bold font-mono">{uploadProgress}%</span>
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
               </button>
             ) : (
               <button 
