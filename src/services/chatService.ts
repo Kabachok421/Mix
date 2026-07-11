@@ -14,7 +14,7 @@ import {
   deleteDoc,
   limit
 } from 'firebase/firestore';
-import { db, handleFirestoreError } from '../lib/firebase';
+import { db, auth, handleFirestoreError } from '../lib/firebase';
 import { Chat, Message, UserProfile } from '../types';
 
 export const chatService = {
@@ -33,6 +33,24 @@ export const chatService = {
       } as Chat));
       callback(chats);
     }, (error) => handleFirestoreError(error, 'list', 'chats'));
+  },
+
+  // Subscribe to the last message of a chat dynamically
+  subscribeToLastMessage: (chatId: string, callback: (message: Message | null) => void) => {
+    const q = query(
+      collection(db, 'chats', chatId, 'messages'),
+      orderBy('timestamp', 'desc'),
+      limit(1)
+    );
+    return onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        callback({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Message);
+      } else {
+        callback(null);
+      }
+    }, (error) => {
+      console.warn("Last message listener error:", error);
+    });
   },
 
   // Get messages for a chat
@@ -258,6 +276,38 @@ export const chatService = {
     try {
       const msgRef = doc(db, 'chats', chatId, 'messages', messageId);
       await deleteDoc(msgRef);
+
+      // Query the latest message to update the chat's lastMessage
+      const q = query(
+        collection(db, 'chats', chatId, 'messages'),
+        orderBy('timestamp', 'desc'),
+        limit(2)
+      );
+      const snapshot = await getDocs(q);
+      const validDocs = snapshot.docs.filter(d => d.id !== messageId);
+      
+      const chatRef = doc(db, 'chats', chatId);
+      if (validDocs.length > 0) {
+        const lastMsgData = validDocs[0].data();
+        let lastMessageText = '';
+        switch (lastMsgData.type) {
+          case 'image': lastMessageText = '📷 Фото'; break;
+          case 'voice': lastMessageText = '🎤 Голосовое сообщение'; break;
+          case 'file': lastMessageText = `📁 ${lastMsgData.fileName || 'Файл'}`; break;
+          default: lastMessageText = lastMsgData.text || '';
+        }
+        await updateDoc(chatRef, {
+          lastMessage: lastMessageText,
+          lastMessageSenderId: lastMsgData.senderId,
+          updatedAt: serverTimestamp()
+        });
+      } else {
+        await updateDoc(chatRef, {
+          lastMessage: '',
+          lastMessageSenderId: null,
+          updatedAt: serverTimestamp()
+        });
+      }
     } catch (error) {
       handleFirestoreError(error, 'delete', `chats/${chatId}/messages/${messageId}`);
     }

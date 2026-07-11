@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { chatService } from '../services/chatService';
 import { Chat, UserProfile } from '../types';
@@ -11,6 +11,7 @@ import { UserStatus } from './UserStatus';
 import { motion } from 'motion/react';
 
 interface ChatListItemProps {
+  key?: React.Key;
   chat: Chat;
   otherUser: UserProfile | null;
   isActive: boolean;
@@ -20,13 +21,38 @@ interface ChatListItemProps {
 export default function ChatListItem({ chat, otherUser, isActive, onClick }: ChatListItemProps) {
   const { user } = useAuth();
   const [isTyping, setIsTyping] = useState(false);
+  const [realLastMessage, setRealLastMessage] = useState<{ text: string; senderId: string } | null>(null);
 
   useEffect(() => {
-    if (!chat.id || !otherUser?.uid) return;
-    const unsubscribe = chatService.subscribeToTyping(chat.id, otherUser.uid, (typing) => {
+    if (!chat.id) return;
+    
+    let isSubscribed = true;
+    const unsubscribeMsg = chatService.subscribeToLastMessage(chat.id, (msg) => {
+      if (!isSubscribed) return;
+      if (msg) {
+        let text = '';
+        switch (msg.type) {
+          case 'image': text = '📷 Фото'; break;
+          case 'voice': text = '🎤 Голосовое сообщение'; break;
+          case 'file': text = `📁 ${msg.fileName || 'Файл'}`; break;
+          default: text = msg.text || '';
+        }
+        setRealLastMessage({ text, senderId: msg.senderId });
+      } else {
+        setRealLastMessage(null);
+      }
+    });
+
+    if (!otherUser?.uid) return () => { isSubscribed = false; unsubscribeMsg(); };
+    const unsubscribeTyping = chatService.subscribeToTyping(chat.id, otherUser.uid, (typing) => {
       setIsTyping(typing);
     });
-    return () => unsubscribe();
+
+    return () => {
+      isSubscribed = false;
+      unsubscribeMsg();
+      unsubscribeTyping();
+    };
   }, [chat.id, otherUser?.uid]);
 
   return (
@@ -61,12 +87,12 @@ export default function ChatListItem({ chat, otherUser, isActive, onClick }: Cha
                 <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1 h-1 bg-blue-500 rounded-full" />
               </span>
             </div>
-          ) : (
+          ) : realLastMessage && realLastMessage.text && realLastMessage.text !== 'Chat started' ? (
             <span className="text-gray-400 font-light italic">
-              {chat.lastMessageSenderId === user?.uid ? 'Вы: ' : ''}
-              {chat.lastMessage}
+              {realLastMessage.senderId === user?.uid ? 'Вы: ' : ''}
+              {realLastMessage.text}
             </span>
-          )}
+          ) : null}
         </div>
       </div>
     </button>
