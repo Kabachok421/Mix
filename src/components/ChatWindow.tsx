@@ -39,6 +39,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadMethod, setUploadMethod] = useState('');
   const [p2pFiles, setP2pFiles] = useState<Record<string, string>>({});
   const { isRecording, duration, startRecording, stopRecording, cancelRecording } = useVoiceRecorder();
 
@@ -151,17 +152,39 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
 
       let finalUrl = '';
       
-      // Use P2P if the other user is online, otherwise use GoFile
-      if (otherUser?.status === 'online') {
+      const isOtherUserOnline = (() => {
+        if (!otherUser) return false;
+        if (otherUser.status !== 'online') return false;
+        if (otherUser.lastSeen) {
+          let date: Date;
+          if (typeof (otherUser.lastSeen as any).toDate === 'function') {
+            date = (otherUser.lastSeen as any).toDate();
+          } else if ((otherUser.lastSeen as any).seconds) {
+            date = new Date((otherUser.lastSeen as any).seconds * 1000);
+          } else if (typeof otherUser.lastSeen === 'string' || typeof otherUser.lastSeen === 'number') {
+            date = new Date(otherUser.lastSeen);
+          } else {
+            return true;
+          }
+          const now = new Date();
+          if (now.getTime() - date.getTime() > 5 * 60 * 1000) {
+            return false; // Stale for more than 5 minutes
+          }
+        }
+        return true;
+      })();
+      
+      if (isOtherUserOnline) {
+        setUploadMethod('P2P');
         if (file.size > 2 * 1024 * 1024 * 1024) {
            throw new Error("Максимальный размер файла для прямой передачи - 2 ГБ.");
         }
-        await fileTransferService.initiateTransfer(chatId, user.uid, otherUser.uid, file, (progress) => {
+        await fileTransferService.initiateTransfer(chatId, user.uid, otherUser!.uid, file, (progress) => {
            setUploadProgress(Math.round(progress));
         });
-        
         finalUrl = 'p2p-sent';
       } else {
+        setUploadMethod('GoFile');
         const path = `chats/${chatId}/${Date.now()}_${file.name}`;
         finalUrl = await chatService.uploadFile(path, file, (progress) => {
           setUploadProgress(Math.round(progress));
@@ -200,13 +223,37 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
       let finalUrl = '';
       const fileName = `voice_${Date.now()}.webm`;
       
-      if (otherUser?.status === 'online') {
-         const file = new File([recording.blob], fileName, { type: recording.blob.type });
-         await fileTransferService.initiateTransfer(chatId, user.uid, otherUser.uid, file, (progress) => {
-            setUploadProgress(Math.round(progress));
-         });
-         finalUrl = 'p2p-sent';
+      const isOtherUserOnline = (() => {
+        if (!otherUser) return false;
+        if (otherUser.status !== 'online') return false;
+        if (otherUser.lastSeen) {
+          let date: Date;
+          if (typeof (otherUser.lastSeen as any).toDate === 'function') {
+            date = (otherUser.lastSeen as any).toDate();
+          } else if ((otherUser.lastSeen as any).seconds) {
+            date = new Date((otherUser.lastSeen as any).seconds * 1000);
+          } else if (typeof otherUser.lastSeen === 'string' || typeof otherUser.lastSeen === 'number') {
+            date = new Date(otherUser.lastSeen);
+          } else {
+            return true;
+          }
+          const now = new Date();
+          if (now.getTime() - date.getTime() > 5 * 60 * 1000) {
+            return false; // Stale for more than 5 minutes
+          }
+        }
+        return true;
+      })();
+      
+      if (isOtherUserOnline) {
+        setUploadMethod('P2P');
+        const file = new File([recording.blob], fileName, { type: recording.blob.type });
+        await fileTransferService.initiateTransfer(chatId, user.uid, otherUser!.uid, file, (progress) => {
+           setUploadProgress(Math.round(progress));
+        });
+        finalUrl = 'p2p-sent';
       } else {
+         setUploadMethod('GoFile');
          const path = `chats/${chatId}/${fileName}`;
          finalUrl = await chatService.uploadFile(path, recording.blob, (progress) => {
            setUploadProgress(Math.round(progress));
@@ -437,13 +484,25 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
       {/* Input */}
       <div className="p-4 bg-white dark:bg-[#0d0d0d] border-t border-gray-100 dark:border-[#222] transition-colors relative">
         {isUploading && (
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gray-100 dark:bg-gray-800 overflow-hidden">
-            <motion.div 
-              initial={{ width: 0 }}
-              animate={{ width: `${Math.max(uploadProgress, 5)}%` }}
-              transition={{ duration: 0.3 }}
-              className="h-full bg-blue-500"
-            />
+          <div className="absolute bottom-full left-0 right-0 bg-white/90 dark:bg-[#0d0d0d]/90 backdrop-blur-sm px-4 py-2 border-t border-gray-100 dark:border-[#222] flex items-center justify-between shadow-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm text-gray-600 dark:text-gray-300 font-medium flex items-center gap-2">
+                Отправка... 
+                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-mono font-bold">
+                  {uploadMethod}
+                </span>
+              </span>
+            </div>
+            <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{uploadProgress}%</span>
+            <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gray-100 dark:bg-gray-800">
+              <motion.div 
+                initial={{ width: 0 }}
+                animate={{ width: `${Math.max(uploadProgress, 5)}%` }}
+                transition={{ duration: 0.3 }}
+                className="h-full bg-blue-500"
+              />
+            </div>
           </div>
         )}
 
