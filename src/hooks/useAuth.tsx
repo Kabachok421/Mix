@@ -44,9 +44,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // We don't await getDoc here to block onSnapshot, we just let it fetch
           getDoc(userRef).then(async docSnap => {
             if (!docSnap.exists()) {
-               await setDoc(userRef, {
+              await setDoc(userRef, {
                 uid: user.uid,
-                email: user.email,
+                email: user.email || null,
                 displayName: user.displayName || 'Anonymous',
                 photoURL: user.photoURL || '',
                 lastSeen: serverTimestamp(),

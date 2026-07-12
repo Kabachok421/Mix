@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, Camera, Save, EyeOff, Eye, GripVertical } from 'lucide-react';
@@ -102,12 +102,21 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
 
     try {
       const userRef = doc(db, 'users', user.uid);
-      const dataToUpdate: any = { photoURL, hideName, customName: hideName ? customName.trim() : '' };
+      const dataToUpdate: any = { 
+        photoURL, 
+        hideName, 
+        customName: hideName ? customName.trim() : '',
+        uid: user.uid,
+        displayName: user.displayName || 'Anonymous',
+        email: user.email || null,
+        status: 'online',
+        lastSeen: serverTimestamp()
+      };
       if (isNewUsername) {
         dataToUpdate.username = username.toLowerCase();
         dataToUpdate.usernameUpdatedAt = serverTimestamp();
       }
-      await updateDoc(userRef, dataToUpdate);
+      await setDoc(userRef, dataToUpdate, { merge: true });
       if (onComplete) onComplete();
     } catch (err: any) {
       console.error(err);
