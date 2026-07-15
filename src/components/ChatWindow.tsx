@@ -592,26 +592,27 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                   <>
                     <div className="fixed inset-0 z-30" onClick={() => setShowAttachmentMenu(false)} />
                     <motion.div
-                      initial={{ opacity: 0, scale: 0.9, y: -10, x: -20 }}
-                      animate={{ opacity: 1, scale: 1, y: -10, x: -20 }}
-                      exit={{ opacity: 0, scale: 0.9, y: -10, x: -20 }}
-                      className="absolute bottom-full mb-2 left-0 w-48 bg-white dark:bg-[#1a1a1a] rounded-xl shadow-xl border border-gray-100 dark:border-[#333] overflow-hidden z-40"
+                      initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                      transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                      className="absolute bottom-full mb-3 right-0 w-48 bg-gray-900 dark:bg-[#1a1a1a] rounded-2xl shadow-2xl border border-gray-800 dark:border-[#333] overflow-hidden z-40 origin-bottom-right"
                     >
                       <button 
                         type="button"
-                        onClick={() => imageInputRef.current?.click()}
-                        className="w-full text-left px-4 py-3 text-sm flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-[#222] transition-colors"
+                        onClick={() => { imageInputRef.current?.click(); setShowAttachmentMenu(false); }}
+                        className="w-full text-left px-4 py-3 text-sm text-white flex items-center gap-3 hover:bg-gray-800 dark:hover:bg-[#222] transition-colors"
                       >
-                        <ImageIcon className="w-4 h-4 text-blue-500" />
-                        Фото или Видео
+                        <ImageIcon className="w-5 h-5 text-blue-400" />
+                        <span className="font-medium">Фото или Видео</span>
                       </button>
                       <button 
                         type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-full text-left px-4 py-3 text-sm flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-[#222] transition-colors"
+                        onClick={() => { fileInputRef.current?.click(); setShowAttachmentMenu(false); }}
+                        className="w-full text-left px-4 py-3 text-sm text-white flex items-center gap-3 hover:bg-gray-800 dark:hover:bg-[#222] transition-colors"
                       >
-                        <FileIcon className="w-4 h-4 text-purple-500" />
-                        Файл
+                        <FileIcon className="w-5 h-5 text-purple-400" />
+                        <span className="font-medium">Файл</span>
                       </button>
                     </motion.div>
                   </>

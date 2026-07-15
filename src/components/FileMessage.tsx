@@ -45,8 +45,7 @@ export function FileMessage({ type, url, thumbnail, fileName, fileSize, isMe }: 
         {createPortal(
           <AnimatePresence>
             {isFullscreen && (
-              <motion.div
-                initial={{ opacity: 0 }}
+              <motion.div key="modal" initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setIsFullscreen(false)}
@@ -59,8 +58,9 @@ export function FileMessage({ type, url, thumbnail, fileName, fileSize, isMe }: 
                   <X className="w-6 h-6" />
                 </button>
                 
-                <motion.img 
-                  initial={{ scale: 0.9, opacity: 0 }}
+                {imageSrc ? (
+                  <motion.img 
+                    initial={{ scale: 0.9, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0.9, opacity: 0 }}
                   transition={{ type: "spring", damping: 25, stiffness: 300 }}
@@ -68,12 +68,12 @@ export function FileMessage({ type, url, thumbnail, fileName, fileSize, isMe }: 
                   alt={fileName || 'Image fullscreen'} 
                   className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl cursor-default"
                   onClick={(e) => e.stopPropagation()}
-                />
+                  />
+                ) : (
+                  <div className="text-white p-4 bg-black/50 rounded-lg">Изображение недоступно</div>
+                )}
                 
-                <a 
-                  href={url || '#'}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <a href={url || '#'} target="_blank" rel="noopener noreferrer" download={fileName || 'download'}
                   onClick={(e) => e.stopPropagation()}
                   className="absolute bottom-6 right-6 flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-colors z-[201]"
                 >

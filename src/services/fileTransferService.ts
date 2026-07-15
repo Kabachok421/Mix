@@ -22,13 +22,6 @@ class FileTransferService {
     
     const transferDoc = doc(db, `chats/${chatId}/transfers`, transferId);
     
-    await new Promise<void>((resolve) => {
-      pc.onicegatheringstatechange = () => {
-        if (pc.iceGatheringState === 'complete') resolve();
-      };
-      setTimeout(resolve, 2000);
-    });
-
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     
@@ -60,11 +53,13 @@ class FileTransferService {
           unsubscribe();
           await pc.setRemoteDescription(JSON.parse(data.answer));
           
-          dc.onopen = () => {
-             this.sendFile(dc, file, onProgress).then(() => {
-                 resolve('sent');
-             }).catch(reject);
-          };
+          if (dc.readyState === 'open') {
+             this.sendFile(dc, file, onProgress).then(() => resolve('sent')).catch(reject);
+          } else {
+             dc.onopen = () => {
+                this.sendFile(dc, file, onProgress).then(() => resolve('sent')).catch(reject);
+             };
+          }
         } else if (data.status === 'rejected') {
           unsubscribe();
           reject(new Error('Отправка отменена или не удалась'));
