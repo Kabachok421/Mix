@@ -1,11 +1,16 @@
-const fs = require('fs');
-let rules = fs.readFileSync('firestore.rules', 'utf8');
+import fs from 'fs';
+let code = fs.readFileSync('firestore.rules', 'utf8');
 
-const transfersRule = `
-    match /chats/{chatId}/transfers/{transferId} {
-      allow read, write: if isSignedIn() && get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds.hasAny([request.auth.uid]);
-    }
-`;
+code = code.replace(
+  /&& \(data\.get\('customName', ''\) == null \|\| data\.get\('customName', ''\) is string\)/,
+  `&& (data.get('customName', '') == null || data.get('customName', '') is string)
+        && (data.get('isHidden', null) == null || data.get('isHidden', null) is bool)
+        && (data.get('friendCode', '') == null || data.get('friendCode', '') is string)`
+);
 
-rules = rules.replace('match /chats/{chatId}/typing/{userId} {', transfersRule + '\n    match /chats/{chatId}/typing/{userId} {');
-fs.writeFileSync('firestore.rules', rules);
+code = code.replace(
+  /\.hasOnly\(\['displayName', 'photoURL', 'lastSeen', 'status', 'username', 'email', 'usernameUpdatedAt', 'hideName', 'customName'\]\)/,
+  `.hasOnly(['displayName', 'photoURL', 'lastSeen', 'status', 'username', 'email', 'usernameUpdatedAt', 'hideName', 'customName', 'isHidden', 'friendCode'])`
+);
+
+fs.writeFileSync('firestore.rules', code);

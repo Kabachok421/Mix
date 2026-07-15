@@ -11,6 +11,8 @@ export interface UserProfile {
   usernameUpdatedAt?: Timestamp;
   hideName?: boolean;
   customName?: string;
+  isHidden?: boolean;
+  friendCode?: string;
 }
 
 export interface Chat {

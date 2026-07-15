@@ -3,7 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import { doc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Camera, Save, EyeOff, Eye, GripVertical } from 'lucide-react';
+import { User, Camera, Save, EyeOff, Eye, GripVertical, Copy, ShieldAlert } from 'lucide-react';
 import { Avatar } from './Avatar';
 import { cn } from '../lib/utils';
 
@@ -13,6 +13,8 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
   const [photoURL, setPhotoURL] = useState(profile?.photoURL || '');
   const [hideName, setHideName] = useState(profile?.hideName || false);
   const [customName, setCustomName] = useState(profile?.customName || '');
+  const [isHidden, setIsHidden] = useState(profile?.isHidden || false);
+  const friendCode = profile?.friendCode || 'загрузка...';
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   
@@ -106,6 +108,7 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
         photoURL, 
         hideName, 
         customName: hideName ? customName.trim() : '',
+        isHidden,
         uid: user.uid,
         displayName: user.displayName || 'Anonymous',
         email: user.email || null,
@@ -168,8 +171,8 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
             <div 
               ref={smallSliderRef}
               className={cn(
-                "relative h-12 w-full rounded-xl p-1 overflow-hidden transition-colors duration-500",
-                hideName ? "bg-[#1a1a1a] dark:bg-white" : "bg-gray-100 dark:bg-[#333]"
+                "relative h-12 w-full rounded-xl p-1 overflow-hidden transition-colors duration-500 flex items-center",
+                hideName ? "bg-[#1a1a1a] dark:bg-white justify-end" : "bg-gray-100 dark:bg-[#333] justify-start"
               )}
             >
                <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-4">
@@ -180,21 +183,19 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
                
                <motion.div
                  layout
+                 transition={{ type: "spring", stiffness: 400, damping: 30 }}
                  drag="x"
                  dragConstraints={{ left: 0, right: 0 }}
                  dragElastic={0.4}
                  onDragEnd={(e, info) => {
                    const width = smallSliderRef.current?.offsetWidth || 200;
-                   if (info.offset.x > width * 0.6 && !hideName) {
+                   if (info.offset.x > width * 0.4 && !hideName) {
                      setHideName(true);
-                   } else if (info.offset.x < -width * 0.6 && hideName) {
+                   } else if (info.offset.x < -width * 0.4 && hideName) {
                      setHideName(false);
                    }
                  }}
-                 className={cn(
-                    "h-full w-12 rounded-[10px] bg-white dark:bg-black shadow flex items-center justify-center cursor-grab active:cursor-grabbing z-10 relative pointer-events-auto",
-                    hideName ? "ml-auto" : "ml-0"
-                 )}
+                 className="h-full w-12 rounded-[10px] bg-white dark:bg-black shadow flex items-center justify-center cursor-grab active:cursor-grabbing z-10 relative pointer-events-auto"
                >
                  <motion.div animate={{ rotate: hideName ? 180 : 0 }} className="flex items-center text-gray-800 dark:text-gray-200">
                     <GripVertical className="w-3 h-3 opacity-30" />
@@ -221,6 +222,52 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
                 </motion.div>
               )}
             </AnimatePresence>
+          </div>
+
+          
+          <div className="bg-gray-50 dark:bg-[#1a1a1a] rounded-xl p-4 border border-gray-200 dark:border-[#333]">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-orange-500" />
+                  Скрытый профиль
+                </h4>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Вас нельзя будет найти через обычный поиск. Только по коду друга.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsHidden(!isHidden)}
+                className={`w-12 h-6 rounded-full transition-colors relative ${isHidden ? 'bg-[#5A5A40] dark:bg-[#A0A080]' : 'bg-gray-300 dark:bg-gray-600'}`}
+              >
+                <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${isHidden ? 'left-7' : 'left-1'}`} />
+              </button>
+            </div>
+            
+            {isHidden && (
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-[#333]">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Ваш код друга:</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 bg-white dark:bg-black px-3 py-2 rounded-lg text-center font-mono font-bold tracking-widest border border-gray-200 dark:border-[#444] dark:text-white">
+                    {friendCode}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      navigator.clipboard.writeText(friendCode);
+                      const btn = e.currentTarget;
+                      const originalHtml = btn.innerHTML;
+                      btn.innerHTML = '<span class="text-xs font-medium">✓</span>';
+                      setTimeout(() => { btn.innerHTML = originalHtml; }, 2000);
+                    }}
+                    className="p-2 bg-white dark:bg-black rounded-lg border border-gray-200 dark:border-[#444] text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors"
+                  >
+                    <Copy className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <button 
@@ -284,8 +331,8 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
             <div 
               ref={fullSliderRef}
               className={cn(
-                "relative h-14 w-full rounded-2xl p-1.5 overflow-hidden transition-colors duration-500 shadow-inner",
-                hideName ? "bg-[#1a1a1a] dark:bg-white" : "bg-gray-100 dark:bg-[#222]"
+                "relative h-14 w-full rounded-2xl p-1.5 overflow-hidden transition-colors duration-500 shadow-inner flex items-center",
+                hideName ? "bg-[#1a1a1a] dark:bg-white justify-end" : "bg-gray-100 dark:bg-[#222] justify-start"
               )}
             >
                <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-4">
@@ -296,21 +343,19 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
                
                <motion.div
                  layout
+                 transition={{ type: "spring", stiffness: 400, damping: 30 }}
                  drag="x"
                  dragConstraints={{ left: 0, right: 0 }}
                  dragElastic={0.4}
                  onDragEnd={(e, info) => {
                    const width = fullSliderRef.current?.offsetWidth || 200;
-                   if (info.offset.x > width * 0.6 && !hideName) {
+                   if (info.offset.x > width * 0.4 && !hideName) {
                      setHideName(true);
-                   } else if (info.offset.x < -width * 0.6 && hideName) {
+                   } else if (info.offset.x < -width * 0.4 && hideName) {
                      setHideName(false);
                    }
                  }}
-                 className={cn(
-                    "h-full w-14 rounded-xl bg-white dark:bg-black shadow-md flex items-center justify-center cursor-grab active:cursor-grabbing z-10 relative pointer-events-auto",
-                    hideName ? "ml-auto" : "ml-0"
-                 )}
+                 className="h-full w-14 rounded-xl bg-white dark:bg-black shadow-md flex items-center justify-center cursor-grab active:cursor-grabbing z-10 relative pointer-events-auto"
                >
                  <motion.div animate={{ rotate: hideName ? 180 : 0 }} className="flex items-center text-gray-800 dark:text-gray-200">
                     <GripVertical className="w-4 h-4 opacity-30" />
@@ -337,6 +382,52 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
                 </motion.div>
               )}
             </AnimatePresence>
+          </div>
+
+          
+          <div className="bg-gray-50 dark:bg-[#1a1a1a] rounded-xl p-4 border border-gray-200 dark:border-[#333]">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-orange-500" />
+                  Скрытый профиль
+                </h4>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Вас нельзя будет найти через обычный поиск. Только по коду друга.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsHidden(!isHidden)}
+                className={`w-12 h-6 rounded-full transition-colors relative ${isHidden ? 'bg-[#5A5A40] dark:bg-[#A0A080]' : 'bg-gray-300 dark:bg-gray-600'}`}
+              >
+                <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${isHidden ? 'left-7' : 'left-1'}`} />
+              </button>
+            </div>
+            
+            {isHidden && (
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-[#333]">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Ваш код друга:</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 bg-white dark:bg-black px-3 py-2 rounded-lg text-center font-mono font-bold tracking-widest border border-gray-200 dark:border-[#444] dark:text-white">
+                    {friendCode}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      navigator.clipboard.writeText(friendCode);
+                      const btn = e.currentTarget;
+                      const originalHtml = btn.innerHTML;
+                      btn.innerHTML = '<span class="text-xs font-medium">✓</span>';
+                      setTimeout(() => { btn.innerHTML = originalHtml; }, 2000);
+                    }}
+                    className="p-2 bg-white dark:bg-black rounded-lg border border-gray-200 dark:border-[#444] text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors"
+                  >
+                    <Copy className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <button 

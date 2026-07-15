@@ -49,7 +49,7 @@ export default function UserSearch({ onStartChat }: UserSearchProps) {
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Поиск по нику (@username)..."
+          placeholder="Поиск по нику или коду друга..."
           className="w-full bg-gray-100 dark:bg-[#1a1a1a] rounded-full py-2.5 pl-10 pr-4 text-sm focus:bg-white dark:focus:bg-[#111] focus:ring-2 focus:ring-[#5A5A40]/30 dark:focus:ring-[#A0A080]/20 outline-none transition-all border border-transparent focus:border-[#5A5A40]/20 dark:text-white"
         />
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-[#5A5A40] dark:group-focus-within:text-[#A0A080]" />

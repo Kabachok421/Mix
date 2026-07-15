@@ -44,6 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // We don't await getDoc here to block onSnapshot, we just let it fetch
           getDoc(userRef).then(async docSnap => {
             if (!docSnap.exists()) {
+              const newFriendCode = (Date.now().toString(36).substring(4) + Math.random().toString(36).substring(2, 6)).toUpperCase();
               await setDoc(userRef, {
                 uid: user.uid,
                 email: user.email || null,
@@ -51,18 +52,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 photoURL: user.photoURL || '',
                 lastSeen: serverTimestamp(),
                 status: 'online',
-                username: ''
+                username: '',
+                friendCode: newFriendCode
               });
             } else {
-               await setDoc(userRef, {
-                 lastSeen: serverTimestamp(),
-                 status: 'online'
-               }, { merge: true });
+               const data = docSnap.data();
+               const updates: any = { status: 'online', lastSeen: serverTimestamp() };
+               if (!data.friendCode) {
+                 updates.friendCode = (Date.now().toString(36).substring(4) + Math.random().toString(36).substring(2, 6)).toUpperCase();
+               }
+               await setDoc(userRef, updates, { merge: true });
             }
           }).catch(err => {
             console.error("Failed to sync user details:", err);
           });
-
         } catch (error: any) {
              console.error("Firestore error in useAuth:", error);
         }

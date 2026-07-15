@@ -39,6 +39,8 @@ service cloud.firestore {
         && (data.get('usernameUpdatedAt', null) == null || data.get('usernameUpdatedAt', null) is timestamp)
         && (data.get('hideName', null) == null || data.get('hideName', null) is bool)
         && (data.get('customName', '') == null || data.get('customName', '') is string)
+        && (data.get('isHidden', null) == null || data.get('isHidden', null) is bool)
+        && (data.get('friendCode', '') == null || data.get('friendCode', '') is string)
         && (data.get('status', 'offline') in ['online', 'offline']);
     }
 
@@ -67,7 +69,7 @@ service cloud.firestore {
       allow read: if isSignedIn(); // Allow discovery
       allow create: if isOwner(userId) && isValidUser(incoming());
       allow update: if isOwner(userId) && isValidUser(incoming())
-        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'lastSeen', 'status', 'username', 'email', 'usernameUpdatedAt', 'hideName', 'customName'])
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'lastSeen', 'status', 'username', 'email', 'usernameUpdatedAt', 'hideName', 'customName', 'isHidden', 'friendCode'])
         && (
           !incoming().diff(existing()).affectedKeys().hasAny(['username']) 
           || (

@@ -180,7 +180,7 @@ export const chatService = {
   },
 
   // Search users by username
-  searchUsers: async (searchTerm: string, currentUserId: string) => {
+    searchUsers: async (searchTerm: string, currentUserId: string) => {
     try {
       const q = query(
         collection(db, 'users'),
@@ -190,9 +190,27 @@ export const chatService = {
       );
       
       const snapshot = await getDocs(q);
-      return snapshot.docs
+      let users = snapshot.docs
         .map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile))
-        .filter(u => u.uid !== currentUserId);
+        .filter(u => u.uid !== currentUserId && !u.isHidden);
+
+      // Also search by exact friend code
+      const friendCodeQuery = query(
+        collection(db, 'users'),
+        where('friendCode', '==', searchTerm.trim().toUpperCase()),
+        limit(1)
+      );
+      const friendCodeSnapshot = await getDocs(friendCodeQuery);
+      friendCodeSnapshot.docs.forEach(doc => {
+        const u = { uid: doc.id, ...doc.data() } as UserProfile;
+        if (u.uid !== currentUserId) {
+          if (!users.find(existing => existing.uid === u.uid)) {
+            users.push(u);
+          }
+        }
+      });
+
+      return users;
     } catch (error) {
       handleFirestoreError(error, 'list', 'users');
     }
