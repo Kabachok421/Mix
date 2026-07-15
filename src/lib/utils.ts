@@ -7,6 +7,41 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export function generateThumbnail(file: File, maxWidth: number = 400, maxHeight: number = 400): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width = width * ratio;
+          height = height * ratio;
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          return reject(new Error('Canvas context not available'));
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.7)); // 0.7 quality to keep size small
+      };
+      img.onerror = (err) => reject(err);
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
+}
+
 export function getUserDisplayName(user: UserProfile | undefined): string {
   if (!user) return 'Anonymous';
   if (user.hideName) {

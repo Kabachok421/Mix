@@ -4,12 +4,13 @@ import { File, Download, Image as ImageIcon } from 'lucide-react';
 interface FileMessageProps {
   type: 'image' | 'file';
   url: string;
+  thumbnail?: string;
   fileName?: string;
   fileSize?: number;
   isMe: boolean;
 }
 
-export function FileMessage({ type, url, fileName, fileSize, isMe }: FileMessageProps) {
+export function FileMessage({ type, url, thumbnail, fileName, fileSize, isMe }: FileMessageProps) {
   const formatSize = (bytes?: number) => {
     if (!bytes) return '';
     if (bytes < 1024) return `${bytes} B`;
@@ -19,7 +20,8 @@ export function FileMessage({ type, url, fileName, fileSize, isMe }: FileMessage
 
   if (type === 'image') {
     const isGoFile = url.includes('gofile.io');
-    if (isGoFile) {
+    
+    if (isGoFile && !thumbnail) {
       return (
         <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 underline hover:opacity-80">
           <ImageIcon className="w-4 h-4" />
@@ -27,9 +29,10 @@ export function FileMessage({ type, url, fileName, fileSize, isMe }: FileMessage
         </a>
       );
     }
+
     return (
       <div className="max-w-full rounded-lg overflow-hidden cursor-pointer" onClick={() => window.open(url, '_blank')}>
-        <img src={url} alt={fileName || 'Image'} className="max-h-60 object-contain w-full hover:opacity-95 transition-opacity" />
+        <img src={thumbnail || url} alt={fileName || 'Image'} className="max-h-60 object-contain w-full hover:opacity-95 transition-opacity" />
       </div>
     );
   }

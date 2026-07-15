@@ -40,6 +40,7 @@ export interface Message {
   timestamp: Timestamp;
   type: 'text' | 'image' | 'file' | 'voice';
   url?: string;
+  thumbnail?: string;
   fileName?: string;
   fileSize?: number;
   duration?: number; // for voice

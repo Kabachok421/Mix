@@ -5,7 +5,7 @@ import { fileTransferService } from '../services/fileTransferService';
 import { Chat, Message, UserProfile } from '../types';
 import { Send, Smile, Paperclip, MoreVertical, MessageSquare, Trash2, ChevronLeft, Mic, X, Image as ImageIcon, File as FileIcon, Loader2, Video } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn, getUserDisplayName, formatLastSeen } from '../lib/utils';
+import { cn, getUserDisplayName, formatLastSeen, generateThumbnail } from '../lib/utils';
 import { UserName } from './UserName';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -191,13 +191,23 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
         });
       }
 
+      let thumbnail = undefined;
+      if (type === 'image') {
+        try {
+          thumbnail = await generateThumbnail(file);
+        } catch (e) {
+          console.error('Failed to generate thumbnail', e);
+        }
+      }
+
       await chatService.sendMessage(
         chatId, 
         user.uid, 
         getUserDisplayName(profile as UserProfile) || user.displayName || 'Anonymous', 
         { 
           type, 
-          url: finalUrl, 
+          url: finalUrl,
+          thumbnail,
           fileName: file.name, 
           fileSize: file.size 
         }
@@ -442,7 +452,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                          <span>{isMe ? 'Файл отправлен напрямую (P2P)' : 'Файл недоступен (прямая передача)'}</span>
                       </div>
                     ) : (
-                      <FileMessage type={msg.type} url={msg.url === 'p2p-sent' ? p2pFiles[msg.fileName || ''] : msg.url!} fileName={msg.fileName} fileSize={msg.fileSize} isMe={isMe} />
+                      <FileMessage type={msg.type} url={msg.url === 'p2p-sent' ? p2pFiles[msg.fileName || ''] : msg.url!} thumbnail={msg.thumbnail} fileName={msg.fileName} fileSize={msg.fileSize} isMe={isMe} />
                     )
                   ) : (
                     msg.text
