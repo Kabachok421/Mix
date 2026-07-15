@@ -179,6 +179,11 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
         if (file.size > 2 * 1024 * 1024 * 1024) {
            throw new Error("Максимальный размер файла для прямой передачи - 2 ГБ.");
         }
+        
+        // Save the object URL so the sender can view it immediately
+        const objUrl = URL.createObjectURL(file);
+        setP2pFiles(prev => ({ ...prev, [file.name]: objUrl }));
+
         await fileTransferService.initiateTransfer(chatId, user.uid, otherUser!.uid, file, (progress) => {
            setUploadProgress(Math.round(progress));
         });

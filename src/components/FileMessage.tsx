@@ -1,5 +1,7 @@
-import React from 'react';
-import { File, Download, Image as ImageIcon } from 'lucide-react';
+import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
+import { File, Download, Image as ImageIcon, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface FileMessageProps {
   type: 'image' | 'file';
@@ -11,6 +13,8 @@ interface FileMessageProps {
 }
 
 export function FileMessage({ type, url, thumbnail, fileName, fileSize, isMe }: FileMessageProps) {
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
   const formatSize = (bytes?: number) => {
     if (!bytes) return '';
     if (bytes < 1024) return `${bytes} B`;
@@ -19,7 +23,7 @@ export function FileMessage({ type, url, thumbnail, fileName, fileSize, isMe }: 
   };
 
   if (type === 'image') {
-    const isGoFile = url.includes('gofile.io');
+    const isGoFile = url?.includes('gofile.io');
     
     if (isGoFile && !thumbnail) {
       return (
@@ -30,10 +34,58 @@ export function FileMessage({ type, url, thumbnail, fileName, fileSize, isMe }: 
       );
     }
 
+    const imageSrc = isGoFile ? thumbnail : (url || thumbnail);
+
     return (
-      <div className="max-w-full rounded-lg overflow-hidden cursor-pointer" onClick={() => window.open(url, '_blank')}>
-        <img src={thumbnail || url} alt={fileName || 'Image'} className="max-h-60 object-contain w-full hover:opacity-95 transition-opacity" />
-      </div>
+      <>
+        <div className="max-w-full rounded-lg overflow-hidden cursor-pointer" onClick={() => setIsFullscreen(true)}>
+          <img src={imageSrc} alt={fileName || 'Image'} className="max-h-60 object-contain w-full hover:opacity-95 transition-opacity bg-black/10 dark:bg-white/5" />
+        </div>
+
+        {createPortal(
+          <AnimatePresence>
+            {isFullscreen && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsFullscreen(false)}
+                className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm cursor-zoom-out"
+              >
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setIsFullscreen(false); }}
+                  className="absolute top-4 right-4 p-2 text-white/50 hover:text-white bg-black/20 hover:bg-black/40 rounded-full transition-colors z-[201]"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+                
+                <motion.img 
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                  transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                  src={imageSrc} 
+                  alt={fileName || 'Image fullscreen'} 
+                  className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl cursor-default"
+                  onClick={(e) => e.stopPropagation()}
+                />
+                
+                <a 
+                  href={url || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="absolute bottom-6 right-6 flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-colors z-[201]"
+                >
+                  <Download className="w-4 h-4" />
+                  <span className="text-sm font-medium">Скачать</span>
+                </a>
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body
+        )}
+      </>
     );
   }
 
