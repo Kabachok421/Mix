@@ -127,13 +127,19 @@ export const chatService = {
 
       const timestamp = serverTimestamp();
       
-      const messageData = {
-        ...data,
+      const messageData: any = {
         senderId,
         senderName,
         timestamp,
         type: data.type || 'text'
       };
+      
+      if (data.text) messageData.text = data.text;
+      if (data.url) messageData.url = data.url;
+      if (data.thumbnail) messageData.thumbnail = data.thumbnail;
+      if (data.fileName) messageData.fileName = data.fileName;
+      if (data.fileSize) messageData.fileSize = data.fileSize;
+      if (data.duration) messageData.duration = data.duration;
 
       await addDoc(messagesRef, messageData);
 
