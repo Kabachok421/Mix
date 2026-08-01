@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import fs from 'fs';
+
+const code = `import React, { useEffect, useState } from 'react';
 import { UserProfile } from '../types';
 import { chatService } from '../services/chatService';
 import { Shield, ShieldAlert, Wifi, WifiOff, Edit2, Ban, Check, X } from 'lucide-react';
@@ -110,9 +112,9 @@ export default function AdminPanel() {
           const isBanning = banningUserId === u.uid;
           
           return (
-          <div key={u.uid} className={`flex flex-col p-4 border rounded-2xl transition-colors ${userIsBanned ? 'border-red-200 bg-red-50/30 dark:border-red-900/50 dark:bg-red-900/10' : 'border-gray-100 dark:border-[#333] bg-gray-50/50 dark:bg-[#1a1a1a]/50'}`}>
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div key={u.uid} className={\`flex flex-col p-4 border rounded-2xl transition-colors \${userIsBanned ? 'border-red-200 bg-red-50/30 dark:border-red-900/50 dark:bg-red-900/10' : 'border-gray-100 dark:border-[#333] bg-gray-50/50 dark:bg-[#1a1a1a]/50'}\`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-800 overflow-hidden flex items-center justify-center shrink-0">
                   {u.photoURL ? (
                     <img src={u.photoURL} alt={u.displayName || 'Avatar'} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -128,7 +130,7 @@ export default function AdminPanel() {
                 </div>
               </div>
               
-              <div className="flex flex-col items-end gap-2 shrink-0">
+              <div className="flex flex-col items-end gap-2">
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => {
@@ -185,13 +187,13 @@ export default function AdminPanel() {
             </div>
             
             {isEditing && (
-              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-[#333] flex flex-wrap items-center gap-2">
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-[#333] flex items-center gap-2">
                 <input
                   type="text"
                   value={newUsername}
                   onChange={(e) => setNewUsername(e.target.value)}
                   placeholder="Новый никнейм"
-                  className="flex-1 min-w-0 bg-white dark:bg-black border border-gray-200 dark:border-[#444] rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#5A5A40]/30 dark:text-white"
+                  className="flex-1 bg-white dark:bg-black border border-gray-200 dark:border-[#444] rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#5A5A40]/30 dark:text-white"
                 />
                 <button
                   onClick={() => handleUpdateUsername(u.uid)}
@@ -209,7 +211,7 @@ export default function AdminPanel() {
             )}
             
             {isBanning && (
-              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-[#333] flex flex-wrap items-center gap-2">
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-[#333] flex items-center gap-2">
                 <span className="text-xs text-gray-500 dark:text-gray-400">На часов:</span>
                 <input
                   type="number"
@@ -238,3 +240,6 @@ export default function AdminPanel() {
     </div>
   );
 }
+`;
+
+fs.writeFileSync('src/components/AdminPanel.tsx', code);

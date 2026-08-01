@@ -13,6 +13,7 @@ export interface UserProfile {
   customName?: string;
   isHidden?: boolean;
   friendCode?: string;
+  bannedUntil?: Timestamp | null;
 }
 
 export interface Chat {

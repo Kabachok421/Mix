@@ -226,6 +226,14 @@ export const chatService = {
     }
   },
 
+  updateUserAdmin: async (userId: string, data: Partial<UserProfile>) => {
+    try {
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, data);
+    } catch (error) {
+      handleFirestoreError(error, 'update', 'users');
+    }
+  },
   // Subscribe to user profile (status, lastSeen, etc)
   subscribeToUserProfile: (userId: string, callback: (profile: UserProfile | null) => void) => {
     const docRef = doc(db, 'users', userId);

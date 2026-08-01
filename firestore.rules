@@ -27,6 +27,12 @@ service cloud.firestore {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
+        function isAdmin() {
+      return isSignedIn() && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isAdmin', false) == true ||
+        request.auth.token.email == 'kko593764@gmail.com'
+      );
+    }
     // --- Validations ---
 
     function isValidUser(data) {
@@ -41,7 +47,9 @@ service cloud.firestore {
         && (data.get('customName', '') == null || data.get('customName', '') is string)
         && (data.get('isHidden', null) == null || data.get('isHidden', null) is bool)
         && (data.get('friendCode', '') == null || data.get('friendCode', '') is string)
-        && (data.get('status', 'offline') in ['online', 'offline']);
+        && (data.get('status', 'offline') in ['online', 'offline'])
+        && (data.get('bannedUntil', null) == null || data.get('bannedUntil', null) is timestamp)
+        && (data.get('isAdmin', false) == null || data.get('isAdmin', false) is bool);
     }
 
     function isValidChat(data) {
@@ -68,20 +76,15 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isSignedIn(); // Allow discovery
       allow create: if isOwner(userId) && isValidUser(incoming());
-      allow update: if isOwner(userId) && isValidUser(incoming())
+      allow update: if isAdmin() || (
+        isOwner(userId) && isValidUser(incoming())
         && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'lastSeen', 'status', 'username', 'email', 'usernameUpdatedAt', 'hideName', 'customName', 'isHidden', 'friendCode'])
         && (
           !incoming().diff(existing()).affectedKeys().hasAny(['username']) 
-          || (
-            incoming().usernameUpdatedAt == request.time 
-            && (
-              existing().get('usernameUpdatedAt', null) == null 
-              || existing().get('usernameUpdatedAt', null).toMillis() + (24 * 60 * 60 * 1000) <= request.time.toMillis()
-            )
-          )
-        );
+           || existing().get('username', '') == ''
+        )
+      );
     }
-
     match /chats/{chatId} {
       allow list: if isSignedIn() && resource.data.participantIds.hasAny([request.auth.uid]);
       allow get: if isSignedIn() && (resource == null || resource.data.participantIds.hasAny([request.auth.uid]));

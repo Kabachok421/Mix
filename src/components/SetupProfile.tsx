@@ -22,27 +22,10 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
 
   const smallSliderRef = useRef<HTMLDivElement>(null);
   const fullSliderRef = useRef<HTMLDivElement>(null);
+  const smallHiddenSliderRef = useRef<HTMLDivElement>(null);
+  const fullHiddenSliderRef = useRef<HTMLDivElement>(null);
 
-  const isUsernameLocked = (() => {
-    if (!profile?.usernameUpdatedAt) return false;
-    try {
-      let lastUpdate: Date;
-      const t = profile.usernameUpdatedAt as any;
-      if (typeof t.toDate === 'function') {
-        lastUpdate = t.toDate();
-      } else if (t.seconds) {
-        lastUpdate = new Date(t.seconds * 1000);
-      } else if (t instanceof Date) {
-        lastUpdate = t;
-      } else {
-        return false;
-      }
-      const hoursSinceUpdate = (new Date().getTime() - lastUpdate.getTime()) / (1000 * 60 * 60);
-      return hoursSinceUpdate < 24;
-    } catch {
-      return false;
-    }
-  })();
+  const isUsernameLocked = !!profile?.username;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -162,49 +145,54 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
               className="w-full bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#333] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#5A5A40]/30 dark:focus:ring-[#A0A080]/30 transition-shadow dark:text-white disabled:opacity-50"
               placeholder="zxc_vasya"
             />
-            {isUsernameLocked && <p className="text-[10px] text-gray-400 mt-1">Изменение никнейма доступно 1 раз в 24 часа</p>}
+            {isUsernameLocked && <p className="text-[10px] text-gray-400 mt-1">Изменение никнейма недоступно</p>}
           </div>
 
           {error && <p className="text-red-500 text-xs text-center">{error}</p>}
 
           <div className="space-y-3 mt-2">
-            <div 
-              ref={smallSliderRef}
-              className={cn(
-                "relative h-12 w-full rounded-xl p-1 overflow-hidden transition-colors duration-500 flex items-center",
-                hideName ? "bg-[#1a1a1a] dark:bg-white justify-end" : "bg-gray-100 dark:bg-[#333] justify-start"
-              )}
-            >
-               <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-4">
-                 <span className={cn("text-xs font-medium transition-colors duration-500", hideName ? "text-white dark:text-black" : "text-gray-500 dark:text-gray-400")}>
-                   {hideName ? "Реальное имя скрыто" : "Потяните чтобы скрыть имя"}
-                 </span>
-               </div>
-               
-               <motion.div
-                 layout
-                 transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                 drag="x"
-                 dragConstraints={{ left: 0, right: 0 }}
-                 dragElastic={0.4}
-                 onDragEnd={(e, info) => {
-                   const width = smallSliderRef.current?.offsetWidth || 200;
-                   if (info.offset.x > width * 0.4 && !hideName) {
-                     setHideName(true);
-                   } else if (info.offset.x < -width * 0.4 && hideName) {
-                     setHideName(false);
-                   }
-                 }}
-                 className="h-full w-12 rounded-[10px] bg-white dark:bg-black shadow flex items-center justify-center cursor-grab active:cursor-grabbing z-10 relative pointer-events-auto"
-               >
-                 <motion.div animate={{ rotate: hideName ? 180 : 0 }} className="flex items-center text-gray-800 dark:text-gray-200">
-                    <GripVertical className="w-3 h-3 opacity-30" />
-                    {hideName ? <EyeOff className="w-4 h-4 ml-[-2px]" /> : <Eye className="w-4 h-4 ml-[-2px]" />}
+            <button
+                type="button"
+                onClick={() => setHideName(!hideName)}
+                className={cn(
+                  "relative w-full h-12 rounded-full p-1 transition-colors duration-500 flex items-center cursor-pointer",
+                  hideName ? "bg-[#1a1a1a] dark:bg-white" : "bg-gray-200 dark:bg-[#333]"
+                )}
+              >
+                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-4 z-0">
+                   <motion.span 
+                     key={hideName ? 'hidden' : 'visible'}
+                     initial={{ opacity: 0, scale: 0.9 }}
+                     animate={{ opacity: 1, scale: 1 }}
+                     transition={{ duration: 0.3 }}
+                     className={cn(
+                       "text-xs font-medium absolute",
+                       hideName ? "text-white dark:text-black" : "text-gray-500 dark:text-gray-400"
+                     )}
+                   >
+                     {hideName ? "Реальное имя скрыто" : "Отображать реальное имя"}
+                   </motion.span>
+                 </div>
+                 
+                 <motion.div
+                   layout
+                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                   className={cn(
+                     "h-10 w-10 rounded-full shadow-md flex items-center justify-center z-10",
+                     hideName ? "bg-[#333] dark:bg-black ml-auto" : "bg-white dark:bg-black ml-0"
+                   )}
+                 >
+                   <motion.div
+                     initial={false}
+                     animate={{ rotate: hideName ? 360 : 0, scale: hideName ? 1.1 : 1 }}
+                     transition={{ duration: 0.4 }}
+                   >
+                     {hideName ? <EyeOff className="w-4 h-4 text-white" /> : <Eye className="w-4 h-4 text-gray-500" />}
+                   </motion.div>
                  </motion.div>
-               </motion.div>
-            </div>
+              </button>
 
-            <AnimatePresence>
+              <AnimatePresence>
               {hideName && (
                 <motion.div
                   initial={{ opacity: 0, height: 0, marginTop: 0 }}
@@ -226,22 +214,54 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
 
           
           <div className="bg-gray-50 dark:bg-[#1a1a1a] rounded-xl p-4 border border-gray-200 dark:border-[#333]">
-            <div className="flex items-center justify-between mb-2">
-              <div>
-                <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
-                  <ShieldAlert className="w-4 h-4 text-orange-500" />
-                  Скрытый профиль
-                </h4>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Вас нельзя будет найти через обычный поиск. Только по коду друга.
-                </p>
-              </div>
+            <div className="mb-4">
+              <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-orange-500" />
+                Скрытый профиль
+              </h4>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 mb-3">
+                Вас нельзя будет найти через обычный поиск. Только по коду друга.
+              </p>
+              
               <button
                 type="button"
                 onClick={() => setIsHidden(!isHidden)}
-                className={`w-12 h-6 rounded-full transition-colors relative ${isHidden ? 'bg-[#5A5A40] dark:bg-[#A0A080]' : 'bg-gray-300 dark:bg-gray-600'}`}
+                className={cn(
+                  "relative w-full h-12 rounded-full p-1 transition-colors duration-500 flex items-center cursor-pointer",
+                  isHidden ? "bg-[#1a1a1a] dark:bg-white" : "bg-gray-200 dark:bg-[#333]"
+                )}
               >
-                <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${isHidden ? 'left-7' : 'left-1'}`} />
+                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-4 z-0">
+                   <motion.span 
+                     key={isHidden ? 'hidden' : 'visible'}
+                     initial={{ opacity: 0, scale: 0.9 }}
+                     animate={{ opacity: 1, scale: 1 }}
+                     transition={{ duration: 0.3 }}
+                     className={cn(
+                       "text-xs font-medium absolute",
+                       isHidden ? "text-white dark:text-black" : "text-gray-500 dark:text-gray-400"
+                     )}
+                   >
+                     {isHidden ? "Профиль скрыт" : "Профиль открыт"}
+                   </motion.span>
+                 </div>
+                 
+                 <motion.div
+                   layout
+                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                   className={cn(
+                     "h-10 w-10 rounded-full shadow-md flex items-center justify-center z-10",
+                     isHidden ? "bg-[#333] dark:bg-black ml-auto" : "bg-white dark:bg-black ml-0"
+                   )}
+                 >
+                   <motion.div
+                     initial={false}
+                     animate={{ rotate: isHidden ? 360 : 0, scale: isHidden ? 1.1 : 1 }}
+                     transition={{ duration: 0.4 }}
+                   >
+                     {isHidden ? <ShieldAlert className="w-4 h-4 text-orange-500" /> : <Eye className="w-4 h-4 text-gray-500" />}
+                   </motion.div>
+                 </motion.div>
               </button>
             </div>
             
@@ -322,49 +342,54 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
               className="w-full bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#333] rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#5A5A40]/30 dark:focus:ring-[#A0A080]/30 transition-shadow dark:text-white disabled:opacity-50"
               placeholder="zxc_vasya"
             />
-            {isUsernameLocked && <p className="text-xs text-gray-400 mt-1">Изменение никнейма доступно 1 раз в 24 часа</p>}
+            {isUsernameLocked && <p className="text-xs text-gray-400 mt-1">Изменение никнейма недоступно</p>}
           </div>
 
           {error && <p className="text-red-500 text-xs text-center">{error}</p>}
 
           <div className="space-y-4">
-            <div 
-              ref={fullSliderRef}
-              className={cn(
-                "relative h-14 w-full rounded-2xl p-1.5 overflow-hidden transition-colors duration-500 shadow-inner flex items-center",
-                hideName ? "bg-[#1a1a1a] dark:bg-white justify-end" : "bg-gray-100 dark:bg-[#222] justify-start"
-              )}
-            >
-               <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-4">
-                 <span className={cn("text-sm font-medium transition-colors duration-500", hideName ? "text-[#f5f5f0] dark:text-[#1a1a1a]" : "text-gray-500 dark:text-gray-400")}>
-                   {hideName ? "Реальное имя скрыто" : "Потяните чтобы скрыть имя"}
-                 </span>
-               </div>
-               
-               <motion.div
-                 layout
-                 transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                 drag="x"
-                 dragConstraints={{ left: 0, right: 0 }}
-                 dragElastic={0.4}
-                 onDragEnd={(e, info) => {
-                   const width = fullSliderRef.current?.offsetWidth || 200;
-                   if (info.offset.x > width * 0.4 && !hideName) {
-                     setHideName(true);
-                   } else if (info.offset.x < -width * 0.4 && hideName) {
-                     setHideName(false);
-                   }
-                 }}
-                 className="h-full w-14 rounded-xl bg-white dark:bg-black shadow-md flex items-center justify-center cursor-grab active:cursor-grabbing z-10 relative pointer-events-auto"
-               >
-                 <motion.div animate={{ rotate: hideName ? 180 : 0 }} className="flex items-center text-gray-800 dark:text-gray-200">
-                    <GripVertical className="w-4 h-4 opacity-30" />
-                    {hideName ? <EyeOff className="w-5 h-5 ml-[-2px]" /> : <Eye className="w-5 h-5 ml-[-2px]" />}
+            <button
+                type="button"
+                onClick={() => setHideName(!hideName)}
+                className={cn(
+                  "relative w-full h-14 rounded-full p-1.5 transition-colors duration-500 flex items-center cursor-pointer",
+                  hideName ? "bg-[#1a1a1a] dark:bg-white" : "bg-gray-200 dark:bg-[#333]"
+                )}
+              >
+                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-4 z-0">
+                   <motion.span 
+                     key={hideName ? 'hidden' : 'visible'}
+                     initial={{ opacity: 0, scale: 0.9 }}
+                     animate={{ opacity: 1, scale: 1 }}
+                     transition={{ duration: 0.3 }}
+                     className={cn(
+                       "text-sm font-medium absolute",
+                       hideName ? "text-white dark:text-black" : "text-gray-500 dark:text-gray-400"
+                     )}
+                   >
+                     {hideName ? "Реальное имя скрыто" : "Отображать реальное имя"}
+                   </motion.span>
+                 </div>
+                 
+                 <motion.div
+                   layout
+                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                   className={cn(
+                     "h-11 w-11 rounded-full shadow-md flex items-center justify-center z-10",
+                     hideName ? "bg-[#333] dark:bg-black ml-auto" : "bg-white dark:bg-black ml-0"
+                   )}
+                 >
+                   <motion.div
+                     initial={false}
+                     animate={{ rotate: hideName ? 360 : 0, scale: hideName ? 1.1 : 1 }}
+                     transition={{ duration: 0.4 }}
+                   >
+                     {hideName ? <EyeOff className="w-5 h-5 text-white" /> : <Eye className="w-5 h-5 text-gray-500" />}
+                   </motion.div>
                  </motion.div>
-               </motion.div>
-            </div>
+              </button>
 
-            <AnimatePresence>
+              <AnimatePresence>
               {hideName && (
                 <motion.div
                   initial={{ opacity: 0, height: 0, marginTop: 0 }}
@@ -386,22 +411,54 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
 
           
           <div className="bg-gray-50 dark:bg-[#1a1a1a] rounded-xl p-4 border border-gray-200 dark:border-[#333]">
-            <div className="flex items-center justify-between mb-2">
-              <div>
-                <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
-                  <ShieldAlert className="w-4 h-4 text-orange-500" />
-                  Скрытый профиль
-                </h4>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Вас нельзя будет найти через обычный поиск. Только по коду друга.
-                </p>
-              </div>
+            <div className="mb-4">
+              <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-orange-500" />
+                Скрытый профиль
+              </h4>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 mb-3">
+                Вас нельзя будет найти через обычный поиск. Только по коду друга.
+              </p>
+              
               <button
                 type="button"
                 onClick={() => setIsHidden(!isHidden)}
-                className={`w-12 h-6 rounded-full transition-colors relative ${isHidden ? 'bg-[#5A5A40] dark:bg-[#A0A080]' : 'bg-gray-300 dark:bg-gray-600'}`}
+                className={cn(
+                  "relative w-full h-14 rounded-full p-1.5 transition-colors duration-500 flex items-center cursor-pointer",
+                  isHidden ? "bg-[#1a1a1a] dark:bg-white" : "bg-gray-200 dark:bg-[#333]"
+                )}
               >
-                <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${isHidden ? 'left-7' : 'left-1'}`} />
+                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-4 z-0">
+                   <motion.span 
+                     key={isHidden ? 'hidden' : 'visible'}
+                     initial={{ opacity: 0, scale: 0.9 }}
+                     animate={{ opacity: 1, scale: 1 }}
+                     transition={{ duration: 0.3 }}
+                     className={cn(
+                       "text-sm font-medium absolute",
+                       isHidden ? "text-white dark:text-black" : "text-gray-500 dark:text-gray-400"
+                     )}
+                   >
+                     {isHidden ? "Профиль скрыт" : "Профиль открыт"}
+                   </motion.span>
+                 </div>
+                 
+                 <motion.div
+                   layout
+                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                   className={cn(
+                     "h-11 w-11 rounded-full shadow-md flex items-center justify-center z-10",
+                     isHidden ? "bg-[#333] dark:bg-black ml-auto" : "bg-white dark:bg-black ml-0"
+                   )}
+                 >
+                   <motion.div
+                     initial={false}
+                     animate={{ rotate: isHidden ? 360 : 0, scale: isHidden ? 1.1 : 1 }}
+                     transition={{ duration: 0.4 }}
+                   >
+                     {isHidden ? <ShieldAlert className="w-5 h-5 text-orange-500" /> : <Eye className="w-5 h-5 text-gray-500" />}
+                   </motion.div>
+                 </motion.div>
               </button>
             </div>
             
