@@ -7,7 +7,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function generateThumbnail(file: File, maxWidth: number = 400, maxHeight: number = 400): Promise<string> {
+export function generateThumbnail(file: File, maxWidth: number = 200, maxHeight: number = 200): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -32,7 +32,7 @@ export function generateThumbnail(file: File, maxWidth: number = 400, maxHeight:
         }
 
         ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.7)); // 0.7 quality to keep size small
+        resolve(canvas.toDataURL('image/jpeg', 0.5)); // 0.5 quality to keep size very small
       };
       img.onerror = (err) => reject(err);
       img.src = e.target?.result as string;

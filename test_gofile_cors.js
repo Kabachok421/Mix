@@ -18,7 +18,6 @@ async function test() {
     body: form
   });
   console.log('Status:', res.status);
-  console.log('Headers:', res.headers);
   const text = await res.text();
   console.log(text);
 }
