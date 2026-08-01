@@ -152,49 +152,11 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
 
       let finalUrl = '';
       
-      const isOtherUserOnline = (() => {
-        if (!otherUser) return false;
-        if (otherUser.status !== 'online') return false;
-        if (otherUser.lastSeen) {
-          let date: Date;
-          if (typeof (otherUser.lastSeen as any).toDate === 'function') {
-            date = (otherUser.lastSeen as any).toDate();
-          } else if ((otherUser.lastSeen as any).seconds) {
-            date = new Date((otherUser.lastSeen as any).seconds * 1000);
-          } else if (typeof otherUser.lastSeen === 'string' || typeof otherUser.lastSeen === 'number') {
-            date = new Date(otherUser.lastSeen);
-          } else {
-            return true;
-          }
-          const now = new Date();
-          if (now.getTime() - date.getTime() > 5 * 60 * 1000) {
-            return false; // Stale for more than 5 minutes
-          }
-        }
-        return true;
-      })();
-      
-      if (isOtherUserOnline) {
-        setUploadMethod('P2P');
-        if (file.size > 2 * 1024 * 1024 * 1024) {
-           throw new Error("Максимальный размер файла для прямой передачи - 2 ГБ.");
-        }
-        
-        // Save the object URL so the sender can view it immediately
-        const objUrl = URL.createObjectURL(file);
-        setP2pFiles(prev => ({ ...prev, [file.name]: objUrl }));
-
-        await fileTransferService.initiateTransfer(chatId, user.uid, otherUser!.uid, file, (progress) => {
-           setUploadProgress(Math.round(progress));
-        });
-        finalUrl = 'p2p-sent';
-      } else {
-        setUploadMethod('GoFile');
-        const path = `chats/${chatId}/${Date.now()}_${file.name}`;
-        finalUrl = await chatService.uploadFile(path, file, (progress) => {
-          setUploadProgress(Math.round(progress));
-        });
-      }
+      setUploadMethod('GoFile');
+      const path = `chats/${chatId}/${Date.now()}_${file.name}`;
+      finalUrl = await chatService.uploadFile(path, file, (progress) => {
+        setUploadProgress(Math.round(progress));
+      });
 
       let thumbnail = undefined;
       if (type === 'image') {
@@ -238,42 +200,11 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
       let finalUrl = '';
       const fileName = `voice_${Date.now()}.webm`;
       
-      const isOtherUserOnline = (() => {
-        if (!otherUser) return false;
-        if (otherUser.status !== 'online') return false;
-        if (otherUser.lastSeen) {
-          let date: Date;
-          if (typeof (otherUser.lastSeen as any).toDate === 'function') {
-            date = (otherUser.lastSeen as any).toDate();
-          } else if ((otherUser.lastSeen as any).seconds) {
-            date = new Date((otherUser.lastSeen as any).seconds * 1000);
-          } else if (typeof otherUser.lastSeen === 'string' || typeof otherUser.lastSeen === 'number') {
-            date = new Date(otherUser.lastSeen);
-          } else {
-            return true;
-          }
-          const now = new Date();
-          if (now.getTime() - date.getTime() > 5 * 60 * 1000) {
-            return false; // Stale for more than 5 minutes
-          }
-        }
-        return true;
-      })();
-      
-      if (isOtherUserOnline) {
-        setUploadMethod('P2P');
-        const file = new File([recording.blob], fileName, { type: recording.blob.type });
-        await fileTransferService.initiateTransfer(chatId, user.uid, otherUser!.uid, file, (progress) => {
-           setUploadProgress(Math.round(progress));
-        });
-        finalUrl = 'p2p-sent';
-      } else {
-         setUploadMethod('GoFile');
-         const path = `chats/${chatId}/${fileName}`;
-         finalUrl = await chatService.uploadFile(path, recording.blob, (progress) => {
-           setUploadProgress(Math.round(progress));
-         });
-      }
+      setUploadMethod('GoFile');
+      const path = `chats/${chatId}/${fileName}`;
+      finalUrl = await chatService.uploadFile(path, recording.blob, (progress) => {
+        setUploadProgress(Math.round(progress));
+      });
 
       await chatService.sendMessage(
         chatId, 
