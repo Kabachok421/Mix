@@ -152,7 +152,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
 
       let finalUrl = '';
       
-      setUploadMethod('GoFile');
+      setUploadMethod(file.size <= 800 * 1024 ? 'Быстро' : 'Облако');
       const path = `chats/${chatId}/${Date.now()}_${file.name}`;
       finalUrl = await chatService.uploadFile(path, file, (progress) => {
         setUploadProgress(Math.round(progress));
@@ -200,7 +200,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
       let finalUrl = '';
       const fileName = `voice_${Date.now()}.webm`;
       
-      setUploadMethod('GoFile');
+      setUploadMethod('Голос');
       const path = `chats/${chatId}/${fileName}`;
       finalUrl = await chatService.uploadFile(path, recording.blob, (progress) => {
         setUploadProgress(Math.round(progress));

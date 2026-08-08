@@ -70,59 +70,60 @@ export const chatService = {
     }, (error) => handleFirestoreError(error, 'list', `chats/${chatId}/messages`));
   },
   
-  // Upload file (using GoFile for free large file storage when user is offline)
+  // Upload file (via server proxy /api/upload or Data URL for voice and small files)
   uploadFile: async (path: string, file: Blob | File, onProgress?: (progress: number) => void) => {
     try {
-      const formData = new FormData();
-      formData.append('reqtype', 'fileupload');
-      formData.append('fileToUpload', file, (file as File).name || 'voice.webm');
-
-      return new Promise<string>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', 'https://catbox.moe/user/api.php', true);
-
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable && onProgress) {
-            const progress = (event.loaded / event.total) * 100;
-            onProgress(progress);
-          }
-        };
-
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(xhr.responseText.trim());
-          } else {
-            reject(new Error('Catbox upload failed with status ' + xhr.status));
-          }
-        };
-
-        xhr.onerror = () => {
-          // Fallback to GoFile on CORS/Network error
-          console.warn('Catbox failed, falling back to GoFile');
-          const fallback = async () => {
-             const serverRes = await fetch('https://api.gofile.io/servers');
-             const serverData = await serverRes.json();
-             const server = serverData.data.servers[0].name;
-             const gfData = new FormData();
-             gfData.append('file', file, (file as File).name || 'voice.webm');
-             
-             const xhrGf = new XMLHttpRequest();
-             xhrGf.open('POST', `https://${server}.gofile.io/contents/uploadfile`, true);
-             xhrGf.onload = () => {
-                if (xhrGf.status >= 200 && xhrGf.status < 300) {
-                  try {
-                    const res = JSON.parse(xhrGf.responseText);
-                    if (res.status === 'ok') resolve(res.data.downloadPage);
-                    else reject(new Error('GoFile error'));
-                  } catch (e) { reject(e); }
-                } else reject(new Error('GoFile error'));
-             };
-             xhrGf.onerror = () => reject(new Error('Network error during fallback upload'));
-             xhrGf.send(gfData);
+      // 1. Voice notes and small files (< 800 KB) convert directly to Data URL for instant delivery
+      if (file.size <= 800 * 1024 || (file as File).name?.startsWith('voice_') || file.type.startsWith('audio/')) {
+        return new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (onProgress) onProgress(100);
+            resolve(reader.result as string);
           };
-          fallback().catch(reject);
+          reader.onerror = (err) => reject(err);
+          reader.readAsDataURL(file);
+        });
+      }
+
+      // 2. Larger files send to our server upload endpoint /api/upload
+      return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            const base64Data = reader.result as string;
+            if (onProgress) onProgress(30);
+
+            const response = await fetch('/api/upload', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                filename: (file as File).name || 'file.bin',
+                mimeType: file.type || 'application/octet-stream',
+                fileData: base64Data
+              })
+            });
+
+            if (onProgress) onProgress(80);
+
+            if (!response.ok) {
+              const errJson = await response.json().catch(() => ({}));
+              throw new Error(errJson.error || `Ошибка сервера: HTTP ${response.status}`);
+            }
+
+            const resJson = await response.json();
+            if (resJson?.url) {
+              if (onProgress) onProgress(100);
+              resolve(resJson.url);
+            } else {
+              throw new Error('Некорректный ответ сервера загрузки');
+            }
+          } catch (err) {
+            reject(err);
+          }
         };
-        xhr.send(formData);
+        reader.onerror = (err) => reject(err);
+        reader.readAsDataURL(file);
       });
     } catch (error) {
       console.error('Error uploading file:', error);

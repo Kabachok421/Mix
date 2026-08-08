@@ -50,16 +50,17 @@ export default function Login() {
           <motion.div 
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-100 dark:border-yellow-900/30 rounded-2xl text-xs text-yellow-800 dark:text-yellow-400"
+            className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-100 dark:border-yellow-900/30 rounded-2xl text-sm text-yellow-800 dark:text-yellow-400"
           >
-            В режиме предпросмотра могут возникать ошибки при входе. Пожалуйста, откройте приложение в новой вкладке.
-            <a href={window.location.href} target="_blank" rel="noopener noreferrer" className="block mt-2 font-bold underline">
-              Открыть в новой вкладке
+            <p className="mb-2"><strong>Внимание:</strong> В режиме предпросмотра браузеры блокируют авторизацию (ошибка сетевого запроса).</p>
+            <p>Пожалуйста, откройте приложение в новой вкладке, чтобы войти.</p>
+            <a href={window.location.href} target="_blank" rel="noopener noreferrer" className="block mt-4 py-2 px-4 bg-yellow-500 text-white rounded-lg font-bold text-center hover:bg-yellow-600 transition-colors">
+              Открыть приложение в новой вкладке
             </a>
           </motion.div>
         )}
 
-        {error && (
+        {error && !isIframe && (
           <motion.div 
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -71,8 +72,10 @@ export default function Login() {
 
         <button
           onClick={handleLogin}
-          disabled={isLoggingIn}
-          className="w-full flex items-center justify-center gap-3 bg-[#1a1a1a] dark:bg-white dark:text-black text-white py-4 rounded-full font-medium hover:bg-[#333] dark:hover:bg-gray-200 transition-colors shadow-md group disabled:opacity-50"
+          disabled={isLoggingIn || isIframe}
+          className={`w-full flex items-center justify-center gap-3 bg-[#1a1a1a] dark:bg-white dark:text-black text-white py-4 rounded-full font-medium transition-colors shadow-md group ${
+            isIframe ? 'opacity-50 cursor-not-allowed hidden' : 'hover:bg-[#333] dark:hover:bg-gray-200'
+          }`}
         >
           {isLoggingIn ? (
              <div className="w-5 h-5 border-2 border-white dark:border-black border-t-transparent rounded-full animate-spin" />
