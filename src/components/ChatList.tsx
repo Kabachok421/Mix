@@ -15,8 +15,8 @@ interface ChatListProps {
 
 import { Avatar } from './Avatar';
 import { UserStatus } from './UserStatus';
-
 import ChatListItem from './ChatListItem';
+import { NotificationPromptBanner } from './NotificationPromptBanner';
 
 export default function ChatList({ onSelectChat, activeChatId }: ChatListProps) {
   const { user } = useAuth();
@@ -31,15 +31,17 @@ export default function ChatList({ onSelectChat, activeChatId }: ChatListProps) 
     const unsubscribeChats = chatService.subscribeToChats(user.uid, (newChats) => {
       setChats(newChats);
       
-      // Subscribe to participant profiles for chats
+      // Subscribe to participant profiles for non-group chats
       for (const chat of newChats) {
-        const otherUserId = chat.participantIds.find(id => id !== user.uid);
-        if (otherUserId && !unsubscribeMap[otherUserId]) {
-          unsubscribeMap[otherUserId] = chatService.subscribeToUserProfile(otherUserId, (profile) => {
-            if (profile) {
-              setParticipantsMap(prev => ({ ...prev, [otherUserId]: profile }));
-            }
-          });
+        if (!chat.isGroup) {
+          const otherUserId = chat.participantIds.find(id => id !== user.uid);
+          if (otherUserId && !unsubscribeMap[otherUserId]) {
+            unsubscribeMap[otherUserId] = chatService.subscribeToUserProfile(otherUserId, (profile) => {
+              if (profile) {
+                setParticipantsMap(prev => ({ ...prev, [otherUserId]: profile }));
+              }
+            });
+          }
         }
       }
     });
@@ -51,7 +53,8 @@ export default function ChatList({ onSelectChat, activeChatId }: ChatListProps) 
   }, [user]);
 
   return (
-    <div className="flex-1 overflow-y-auto custom-scrollbar">
+    <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col">
+      <NotificationPromptBanner />
       {chats.length === 0 ? (
         <div className="p-8 text-center text-gray-400 dark:text-gray-600 italic font-light">
           Нет активных чатов. Начните поиск, чтобы написать кому-нибудь.

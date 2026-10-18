@@ -25,7 +25,13 @@
         "participantIds": { "type": "array", "items": { "type": "string" } },
         "lastMessage": { "type": "string" },
         "lastMessageSenderId": { "type": "string" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "lastMessageSenderName": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "isGroup": { "type": "boolean" },
+        "groupName": { "type": "string" },
+        "groupAvatar": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "adminIds": { "type": "array", "items": { "type": "string" } }
       },
       "required": ["participantIds", "updatedAt"]
     },
@@ -37,9 +43,17 @@
         "text": { "type": "string" },
         "senderId": { "type": "string" },
         "senderName": { "type": "string" },
-        "timestamp": { "type": "string", "format": "date-time" }
+        "timestamp": { "type": "string", "format": "date-time" },
+        "type": { "type": "string", "enum": ["text", "image", "file", "voice", "system"] },
+        "url": { "type": "string" },
+        "thumbnail": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileSize": { "type": "number" },
+        "duration": { "type": "number" },
+        "readBy": { "type": "array", "items": { "type": "string" } },
+        "deliveredTo": { "type": "array", "items": { "type": "string" } }
       },
-      "required": ["text", "senderId", "timestamp"]
+      "required": ["senderId", "timestamp"]
     }
   },
   "firestore": {

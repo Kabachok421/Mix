@@ -155,7 +155,7 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
                 type="button"
                 onClick={() => setHideName(!hideName)}
                 className={cn(
-                  "relative w-full h-12 rounded-full p-1 transition-colors duration-500 flex items-center cursor-pointer",
+                  "relative w-full h-12 rounded-full p-1 transition-colors duration-500 flex items-center cursor-pointer overflow-hidden",
                   hideName ? "bg-[#1a1a1a] dark:bg-white" : "bg-gray-200 dark:bg-[#333]"
                 )}
               >
@@ -176,9 +176,9 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
                  
                  <motion.div
                    layout
-                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                   transition={{ type: "spring", stiffness: 400, damping: 35 }}
                    className={cn(
-                     "h-10 w-10 rounded-full shadow-md flex items-center justify-center z-10",
+                     "h-10 w-10 rounded-full shadow-md flex items-center justify-center z-10 shrink-0",
                      hideName ? "bg-[#333] dark:bg-black ml-auto" : "bg-white dark:bg-black ml-0"
                    )}
                  >
@@ -227,7 +227,7 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
                 type="button"
                 onClick={() => setIsHidden(!isHidden)}
                 className={cn(
-                  "relative w-full h-12 rounded-full p-1 transition-colors duration-500 flex items-center cursor-pointer",
+                  "relative w-full h-12 rounded-full p-1 transition-colors duration-500 flex items-center cursor-pointer overflow-hidden",
                   isHidden ? "bg-[#1a1a1a] dark:bg-white" : "bg-gray-200 dark:bg-[#333]"
                 )}
               >
@@ -248,9 +248,9 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
                  
                  <motion.div
                    layout
-                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                   transition={{ type: "spring", stiffness: 400, damping: 35 }}
                    className={cn(
-                     "h-10 w-10 rounded-full shadow-md flex items-center justify-center z-10",
+                     "h-10 w-10 rounded-full shadow-md flex items-center justify-center z-10 shrink-0",
                      isHidden ? "bg-[#333] dark:bg-black ml-auto" : "bg-white dark:bg-black ml-0"
                    )}
                  >
@@ -352,7 +352,7 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
                 type="button"
                 onClick={() => setHideName(!hideName)}
                 className={cn(
-                  "relative w-full h-14 rounded-full p-1.5 transition-colors duration-500 flex items-center cursor-pointer",
+                  "relative w-full h-14 rounded-full p-1.5 transition-colors duration-500 flex items-center cursor-pointer overflow-hidden",
                   hideName ? "bg-[#1a1a1a] dark:bg-white" : "bg-gray-200 dark:bg-[#333]"
                 )}
               >
@@ -373,9 +373,9 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
                  
                  <motion.div
                    layout
-                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                   transition={{ type: "spring", stiffness: 400, damping: 35 }}
                    className={cn(
-                     "h-11 w-11 rounded-full shadow-md flex items-center justify-center z-10",
+                     "h-11 w-11 rounded-full shadow-md flex items-center justify-center z-10 shrink-0",
                      hideName ? "bg-[#333] dark:bg-black ml-auto" : "bg-white dark:bg-black ml-0"
                    )}
                  >
@@ -424,7 +424,7 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
                 type="button"
                 onClick={() => setIsHidden(!isHidden)}
                 className={cn(
-                  "relative w-full h-14 rounded-full p-1.5 transition-colors duration-500 flex items-center cursor-pointer",
+                  "relative w-full h-14 rounded-full p-1.5 transition-colors duration-500 flex items-center cursor-pointer overflow-hidden",
                   isHidden ? "bg-[#1a1a1a] dark:bg-white" : "bg-gray-200 dark:bg-[#333]"
                 )}
               >
@@ -445,9 +445,9 @@ export default function SetupProfile({ onComplete, fullPage = true }: { onComple
                  
                  <motion.div
                    layout
-                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                   transition={{ type: "spring", stiffness: 400, damping: 35 }}
                    className={cn(
-                     "h-11 w-11 rounded-full shadow-md flex items-center justify-center z-10",
+                     "h-11 w-11 rounded-full shadow-md flex items-center justify-center z-10 shrink-0",
                      isHidden ? "bg-[#333] dark:bg-black ml-auto" : "bg-white dark:bg-black ml-0"
                    )}
                  >

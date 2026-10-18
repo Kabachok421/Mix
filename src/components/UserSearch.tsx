@@ -9,9 +9,10 @@ import { UserName } from './UserName';
 
 interface UserSearchProps {
   onStartChat: (chatId: string) => void;
+  onCreateGroup?: () => void;
 }
 
-export default function UserSearch({ onStartChat }: UserSearchProps) {
+export default function UserSearch({ onStartChat, onCreateGroup }: UserSearchProps) {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [results, setResults] = useState<UserProfile[]>([]);

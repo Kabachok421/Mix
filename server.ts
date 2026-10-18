@@ -1,16 +1,47 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Configure payload limits for large base64 file uploads (up to 50MB)
+  // Directory for local file uploads
+  const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
+  if (!fs.existsSync(UPLOAD_DIR)) {
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+  }
+
+  // Configure payload limits for file uploads (up to 50MB)
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-  // API upload route
+  // Serve uploaded files statically
+  app.use('/uploads', express.static(UPLOAD_DIR));
+
+  // Direct file access route with download and stream support
+  app.get('/api/files/:filename', (req, res) => {
+    try {
+      const filename = path.basename(decodeURIComponent(req.params.filename));
+      const filePath = path.join(UPLOAD_DIR, filename);
+
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: 'Файл не найден' });
+      }
+
+      if (req.query.download === 'true') {
+        return res.download(filePath, filename);
+      }
+
+      res.sendFile(filePath);
+    } catch (err: any) {
+      console.error('File serve error:', err);
+      res.status(500).json({ error: 'Ошибка сервера при отдаче файла' });
+    }
+  });
+
+  // API upload route - safely stores files locally on the server
   app.post('/api/upload', async (req, res) => {
     try {
       const { filename, fileData, mimeType } = req.body;
@@ -22,67 +53,22 @@ async function startServer() {
         ? fileData.split('base64,')[1] 
         : fileData;
       const buffer = Buffer.from(base64Content, 'base64');
-      const safeFilename = filename || 'file.bin';
-      const type = mimeType || 'application/octet-stream';
+      const safeFilename = filename ? path.basename(filename) : 'file.bin';
+      const ext = path.extname(safeFilename) || '';
+      const baseClean = path.basename(safeFilename, ext).replace(/[^a-zA-Z0-9_\-\u0400-\u04FF]/g, '_').substring(0, 40) || 'file';
+      const uniqueName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}_${baseClean}${ext}`;
+      const filePath = path.join(UPLOAD_DIR, uniqueName);
 
-      // 1. Attempt upload to Tmpfiles.org
-      try {
-        const formData = new FormData();
-        const blob = new Blob([buffer], { type });
-        formData.append('file', blob, safeFilename);
+      await fs.promises.writeFile(filePath, buffer);
 
-        const tmpRes = await fetch('https://tmpfiles.org/api/v1/upload', {
-          method: 'POST',
-          body: formData
-        });
-
-        if (tmpRes.ok) {
-          const tmpJson = await tmpRes.json();
-          if (tmpJson?.status === 'success' && tmpJson?.data?.url) {
-            // Convert view URL https://tmpfiles.org/123/file to direct download URL https://tmpfiles.org/dl/123/file
-            const directUrl = tmpJson.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
-            return res.json({ url: directUrl, status: 'ok' });
-          }
-        }
-      } catch (e) {
-        console.warn('Server upload to tmpfiles failed, trying fallback:', e);
-      }
-
-      // 2. Attempt upload to GoFile
-      try {
-        const serverRes = await fetch('https://api.gofile.io/servers');
-        if (serverRes.ok) {
-          const serverData = await serverRes.json();
-          if (serverData?.status === 'ok' && serverData?.data?.servers?.[0]?.name) {
-            const serverName = serverData.data.servers[0].name;
-            const formData = new FormData();
-            const blob = new Blob([buffer], { type });
-            formData.append('file', blob, safeFilename);
-
-            const gfRes = await fetch(`https://${serverName}.gofile.io/contents/uploadfile`, {
-              method: 'POST',
-              body: formData
-            });
-
-            if (gfRes.ok) {
-              const gfJson = await gfRes.json();
-              if (gfJson?.status === 'ok' && gfJson?.data?.downloadPage) {
-                return res.json({ url: gfJson.data.downloadPage, status: 'ok' });
-              }
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('Server upload to GoFile failed:', e);
-      }
-
-      // 3. Fallback to base64 Data URL if file is <= 10MB
-      if (buffer.length <= 10 * 1024 * 1024) {
-        const dataUrl = `data:${type};base64,${base64Content}`;
-        return res.json({ url: dataUrl, status: 'ok' });
-      }
-
-      return res.status(500).json({ error: 'Не удалось загрузить файл на файлообменник' });
+      const fileUrl = `/api/files/${encodeURIComponent(uniqueName)}`;
+      return res.json({ 
+        url: fileUrl, 
+        status: 'ok', 
+        fileName: safeFilename, 
+        fileSize: buffer.length,
+        mimeType: mimeType || 'application/octet-stream'
+      });
     } catch (err: any) {
       console.error('Upload route error:', err);
       res.status(500).json({ error: err.message || 'Ошибка сервера при загрузке файла' });

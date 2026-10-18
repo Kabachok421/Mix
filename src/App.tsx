@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { useTheme } from './hooks/useTheme';
 import Login from './components/Login';
@@ -7,22 +7,104 @@ import ChatWindow from './components/ChatWindow';
 import UserSearch from './components/UserSearch';
 import SetupProfile from './components/SetupProfile';
 import AdminPanel from './components/AdminPanel';
-import { LogOut, MessageSquare, Settings, User as UserIcon, Moon, Sun, X, Shield } from 'lucide-react';
+import { CreateGroupModal } from './components/CreateGroupModal';
+import { LogOut, MessageSquare, Settings, User as UserIcon, Moon, Sun, X, Shield, Bell, Users, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 
 import { Avatar } from './components/Avatar';
 import { CallManager } from './components/CallManager';
 import { UserName } from './components/UserName';
+import { InAppNotificationToast } from './components/InAppNotificationToast';
+import { NotificationSettings } from './components/NotificationSettings';
+import { notificationService } from './services/notificationService';
+import { chatService } from './services/chatService';
+import { UserProfile } from './types';
 
 export default function App() {
   const { user, profile, loading, isOffline, logout } = useAuth();
   const { theme, setTheme } = useTheme();
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState<'profile' | 'admin'>('profile');
   
   const isAdmin = user?.email === 'kko593764@gmail.com';
+
+  const lastKnownTimestampsRef = useRef<Record<string, number>>({});
+  const isInitialLoadRef = useRef(true);
+  const userProfilesCacheRef = useRef<Record<string, UserProfile>>({});
+
+  // When activeChatId changes or window gets focus, clear title flashing
+  useEffect(() => {
+    notificationService.clearTitleFlash();
+  }, [activeChatId]);
+
+  // Global listener for incoming messages to trigger notifications
+  useEffect(() => {
+    if (!user) return;
+
+    const unsubscribeChats = chatService.subscribeToChats(user.uid, (chats) => {
+      if (isInitialLoadRef.current) {
+        // Record existing timestamps so we don't notify for past messages
+        chats.forEach(c => {
+          if (c.updatedAt) {
+            lastKnownTimestampsRef.current[c.id] = c.updatedAt.toMillis();
+          }
+        });
+        isInitialLoadRef.current = false;
+        return;
+      }
+
+      for (const chat of chats) {
+        const chatTime = chat.updatedAt ? chat.updatedAt.toMillis() : 0;
+        const prevTime = lastKnownTimestampsRef.current[chat.id] || 0;
+
+        if (chatTime > prevTime) {
+          lastKnownTimestampsRef.current[chat.id] = chatTime;
+
+          // Check if this was sent by someone else
+          if (chat.lastMessageSenderId && chat.lastMessageSenderId !== user.uid) {
+            const isGroupChat = chat.isGroup;
+            let senderName = chat.lastMessageSenderName || 'Собеседник';
+            let senderAvatar: string | undefined = undefined;
+
+            if (isGroupChat) {
+              senderName = chat.groupName 
+                ? `${chat.lastMessageSenderName ? `${chat.lastMessageSenderName} в «${chat.groupName}»` : chat.groupName}`
+                : (chat.lastMessageSenderName || 'Группа');
+            } else {
+              const otherUserId = chat.participantIds.find(id => id !== user.uid);
+              const cachedProfile = otherUserId ? userProfilesCacheRef.current[otherUserId] : null;
+              senderName = chat.lastMessageSenderName || cachedProfile?.displayName || cachedProfile?.username || 'Собеседник';
+              senderAvatar = cachedProfile?.photoURL;
+
+              if (otherUserId && !cachedProfile) {
+                chatService.getUserProfile(otherUserId).then(p => {
+                  if (p) userProfilesCacheRef.current[otherUserId] = p;
+                }).catch(() => {});
+              }
+            }
+
+            const text = chat.lastMessage || 'Новое сообщение';
+
+            notificationService.notifyNewMessage({
+              chatId: chat.id,
+              senderName,
+              senderAvatar,
+              text,
+              isCurrentChatActive: activeChatId === chat.id,
+              onOpenChat: (id) => setActiveChatId(id)
+            });
+          }
+        }
+      }
+    });
+
+    return () => {
+      unsubscribeChats();
+    };
+  }, [user, activeChatId]);
 
   if (loading) {
     return (
@@ -68,6 +150,7 @@ export default function App() {
   return (
     <div className="fixed inset-0 flex bg-[#f5f5f0] dark:bg-[#050505] overflow-hidden p-0 sm:p-4 transition-colors duration-500 font-sans">
       <CallManager />
+      <InAppNotificationToast onOpenChat={(chatId) => setActiveChatId(chatId)} />
       <div className="flex-1 flex max-w-6xl mx-auto w-full bg-white dark:bg-[#111111] sm:rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.6)] overflow-hidden border border-[#e5e5e0] dark:border-[#222] transition-colors relative">
         
         {/* Sidebar */}
@@ -77,17 +160,28 @@ export default function App() {
         )}>
           <div className="p-6 flex items-center justify-between">
             <h1 className="text-2xl font-serif text-[#1a1a1a] dark:text-white">Mix</h1>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+               <button 
+                  onClick={() => setShowCreateGroup(true)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-[#222] rounded-full transition-colors text-gray-500 dark:text-gray-400 active:scale-95 flex items-center justify-center hover:text-blue-500 dark:hover:text-blue-400"
+                  title="Создать группу"
+               >
+                <Users className="w-5 h-5" />
+              </button>
                <button 
                   onClick={() => setShowSettings(true)}
                   className="p-2 hover:bg-gray-100 dark:hover:bg-[#222] rounded-full transition-colors text-gray-500 dark:text-gray-400 active:scale-95"
+                  title="Настройки"
                >
                 <Settings className="w-5 h-5" />
               </button>
             </div>
           </div>
 
-          <UserSearch onStartChat={(chatId) => setActiveChatId(chatId)} />
+          <UserSearch 
+            onStartChat={(chatId) => setActiveChatId(chatId)} 
+            onCreateGroup={() => setShowCreateGroup(true)}
+          />
           
           <ChatList 
             onSelectChat={(chatId) => setActiveChatId(chatId)} 
@@ -217,6 +311,8 @@ export default function App() {
                       </button>
                     </div>
                   </div>
+
+                  <NotificationSettings />
                   
                   <div className="hidden md:block mt-auto pt-8">
                     {isAdmin && (
@@ -265,6 +361,17 @@ export default function App() {
               </div>
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showCreateGroup && (
+          <CreateGroupModal
+            onClose={() => setShowCreateGroup(false)}
+            onGroupCreated={(newChatId) => {
+              setActiveChatId(newChatId);
+            }}
+          />
         )}
       </AnimatePresence>
     </div>

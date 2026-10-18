@@ -21,8 +21,15 @@ export interface Chat {
   participantIds: string[];
   lastMessage?: string;
   lastMessageSenderId?: string;
+  lastMessageSenderName?: string;
   updatedAt: Timestamp;
   participants?: UserProfile[]; // Populated locally
+  // Group chats support
+  isGroup?: boolean;
+  groupName?: string;
+  groupAvatar?: string;
+  createdBy?: string;
+  adminIds?: string[];
 }
 
 export interface Call {
@@ -35,16 +42,21 @@ export interface Call {
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
+
 export interface Message {
   id: string;
   text?: string;
   senderId: string;
   senderName: string;
   timestamp: Timestamp;
-  type: 'text' | 'image' | 'file' | 'voice';
+  type: 'text' | 'image' | 'file' | 'voice' | 'system';
   url?: string;
   thumbnail?: string;
   fileName?: string;
   fileSize?: number;
   duration?: number; // for voice
+  // Message delivery and read status indicators
+  readBy?: string[];
+  deliveredTo?: string[];
+  status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
 }

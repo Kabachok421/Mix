@@ -55,9 +55,17 @@ service cloud.firestore {
     function isValidChat(data) {
       return data.participantIds is list
         && data.participantIds.size() >= 1
-        && data.participantIds.size() <= 10
+        && data.participantIds.size() <= 50
         && request.auth.uid in data.participantIds
-        && data.updatedAt == request.time;
+        && data.updatedAt == request.time
+        && (data.get('isGroup', false) == null || data.get('isGroup', false) is bool)
+        && (data.get('groupName', '') == null || (data.get('groupName', '') is string && data.get('groupName', '').size() <= 100))
+        && (data.get('groupAvatar', '') == null || (data.get('groupAvatar', '') is string && data.get('groupAvatar', '').size() <= 2000000))
+        && (data.get('createdBy', '') == null || data.get('createdBy', '') is string)
+        && (data.get('adminIds', null) == null || (data.get('adminIds', []) is list && data.get('adminIds', []).size() <= 50))
+        && (data.get('lastMessage', '') == null || (data.get('lastMessage', '') is string && data.get('lastMessage', '').size() <= 5000))
+        && (data.get('lastMessageSenderId', '') == null || data.get('lastMessageSenderId', '') is string)
+        && (data.get('lastMessageSenderName', '') == null || data.get('lastMessageSenderName', '') is string);
     }
 
     function isValidMessage(data, chatId) {
@@ -65,9 +73,11 @@ service cloud.firestore {
       return data.keys().hasAll(['senderId', 'timestamp', 'type'])
         && data.senderId == request.auth.uid
         && data.timestamp == request.time
-        && data.type in ['text', 'image', 'file', 'voice']
-        && (data.type != 'text' || (data.get('text', '') is string && data.get('text', '').size() <= 5000))
-        && (data.type == 'text' || data.keys().hasAll(['url']))
+        && data.type in ['text', 'image', 'file', 'voice', 'system']
+        && (data.type != 'text' && data.type != 'system' || (data.get('text', '') is string && data.get('text', '').size() <= 5000))
+        && (data.type == 'text' || data.type == 'system' || data.keys().hasAll(['url']))
+        && (data.get('readBy', null) == null || (data.get('readBy', []) is list && data.get('readBy', []).size() <= 50))
+        && (data.get('deliveredTo', null) == null || (data.get('deliveredTo', []) is list && data.get('deliveredTo', []).size() <= 50))
         && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
     }
 
@@ -93,10 +103,20 @@ service cloud.firestore {
       
       allow update: if isSignedIn()
         && existing().participantIds.hasAny([request.auth.uid])
-        && incoming().participantIds == existing().participantIds // Participants cannot be changed by client easily
         && (
-          // Action: Update metadata on new message
-          incoming().updatedAt == request.time
+          // Action 1: Update metadata on new message
+          (incoming().participantIds == existing().participantIds && incoming().updatedAt == request.time)
+          ||
+          // Action 2: Update group metadata or participants
+          (
+            existing().get('isGroup', false) == true
+            && incoming().updatedAt == request.time
+            && incoming().diff(existing()).affectedKeys().hasAny(['groupName', 'groupAvatar', 'participantIds', 'adminIds', 'updatedAt', 'lastMessage', 'lastMessageSenderId', 'lastMessageSenderName'])
+            && incoming().participantIds is list
+            && incoming().participantIds.size() >= 1
+            && incoming().participantIds.size() <= 50
+            && (incoming().get('adminIds', null) == null || (incoming().get('adminIds', []) is list && incoming().get('adminIds', []).size() <= 50))
+          )
         );
 
       allow delete: if isSignedIn() && existing().participantIds.hasAny([request.auth.uid]);
@@ -107,8 +127,14 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds.hasAny([request.auth.uid]);
       
       allow create: if isSignedIn() && isValidMessage(incoming(), chatId) && isValidId(messageId);
-      // Messages are immutable in this version, but can be deleted by sender
-      allow update: if false;
+      
+      // Allow participants to mark messages as read / delivered
+      allow update: if isSignedIn()
+        && get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds.hasAny([request.auth.uid])
+        && incoming().diff(existing()).affectedKeys().hasOnly(['readBy', 'deliveredTo'])
+        && (incoming().get('readBy', []) is list && incoming().get('readBy', []).size() <= 50)
+        && (incoming().get('deliveredTo', []) is list && incoming().get('deliveredTo', []).size() <= 50);
+
       allow delete: if isSignedIn() && existing().senderId == request.auth.uid;
     }
 

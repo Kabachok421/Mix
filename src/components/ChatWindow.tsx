@@ -3,7 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import { chatService } from '../services/chatService';
 import { fileTransferService } from '../services/fileTransferService';
 import { Chat, Message, UserProfile } from '../types';
-import { Send, Smile, Paperclip, MoreVertical, MessageSquare, Trash2, ChevronLeft, Mic, X, Image as ImageIcon, File as FileIcon, Loader2, Video, Cloud, Share2 } from 'lucide-react';
+import { Send, Smile, Paperclip, MoreVertical, MessageSquare, Trash2, ChevronLeft, Mic, X, Image as ImageIcon, File as FileIcon, Loader2, Video, Cloud, Share2, Users, Info, UserPlus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, getUserDisplayName, formatLastSeen, generateThumbnail } from '../lib/utils';
 import { UserName } from './UserName';
@@ -17,6 +17,8 @@ import { VoiceMessage } from './VoiceMessage';
 import { FileMessage } from './FileMessage';
 import TypingIndicator from './TypingIndicator';
 import { callService } from '../services/callService';
+import { MessageStatusIndicator } from './MessageStatusIndicator';
+import { GroupInfoModal } from './GroupInfoModal';
 
 interface ChatWindowProps {
   chatId: string;
@@ -25,11 +27,14 @@ interface ChatWindowProps {
 
 export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
   const { user, profile } = useAuth();
+  const [currentChat, setCurrentChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [otherUser, setOtherUser] = useState<UserProfile | null>(null);
+  const [groupMembersMap, setGroupMembersMap] = useState<Record<string, UserProfile>>({});
   const [isOtherTyping, setIsOtherTyping] = useState(false);
   const [input, setInput] = useState('');
   const [showProfile, setShowProfile] = useState(false);
+  const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -40,13 +45,37 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadMethod, setUploadMethod] = useState('');
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [p2pFiles, setP2pFiles] = useState<Record<string, string>>({});
   const { isRecording, duration, startRecording, stopRecording, cancelRecording } = useVoiceRecorder();
 
   const handleDeleteChat = async () => {
-    if (window.confirm('Вы уверены, что хотите удалить этого пользователя из друзей (удалить чат)? Это действие нельзя отменить.')) {
-      await chatService.deleteChat(chatId);
-      if (onClose) onClose();
+    if (!user) return;
+    if (currentChat?.isGroup) {
+      const isCreator = user.uid === currentChat.createdBy;
+      if (isCreator) {
+        if (window.confirm(`Вы уверены, что хотите удалить группу «${currentChat.groupName || 'Группа'}» для всех? Это действие нельзя отменить.`)) {
+          await chatService.deleteChat(chatId);
+          if (onClose) onClose();
+        }
+      } else {
+        if (window.confirm('Вы уверены, что хотите покинуть эту группу?')) {
+          const updated = currentChat.participantIds.filter(id => id !== user.uid);
+          const userName = getUserDisplayName(profile as UserProfile) || user.displayName || 'Участник';
+          await chatService.updateGroupChat(chatId, {
+            participantIds: updated,
+            systemMessage: `${userName} покинул(а) группу`,
+            senderId: user.uid,
+            senderName: userName
+          });
+          if (onClose) onClose();
+        }
+      }
+    } else {
+      if (window.confirm('Вы уверены, что хотите удалить чат? Это действие нельзя отменить.')) {
+        await chatService.deleteChat(chatId);
+        if (onClose) onClose();
+      }
     }
   };
 
@@ -61,25 +90,39 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
   useEffect(() => {
     if (!chatId || !user) return;
 
-    // Load messages
+    // Load messages and automatically mark as read
     const unsubscribeMessages = chatService.subscribeToMessages(chatId, (newMessages) => {
       setMessages(newMessages);
+      chatService.markMessagesAsRead(chatId, user.uid, newMessages);
     });
 
-    // Load chat metadata to get participant info
+    const memberUnsubs: Record<string, () => void> = {};
+
+    // Load chat metadata
+    const unsubscribeChat = chatService.subscribeToChat(chatId, (chatData) => {
+      if (chatData) {
+        setCurrentChat(chatData);
+        // Subscribe to all participants' profiles
+        chatData.participantIds?.forEach(uid => {
+          if (!memberUnsubs[uid]) {
+            memberUnsubs[uid] = chatService.subscribeToUserProfile(uid, (p) => {
+              if (p) setGroupMembersMap(prev => ({ ...prev, [uid]: p }));
+            });
+          }
+        });
+      }
+    });
+
+    // 1-on-1 other user info
     const participantIds = chatId.split('_');
     const otherUserId = participantIds.find(id => id !== user.uid);
 
     let unsubscribeProfile: (() => void) | undefined;
-    if (otherUserId) {
+    let unsubscribeTyping: (() => void) | undefined;
+    if (otherUserId && !chatId.startsWith('group_')) {
       unsubscribeProfile = chatService.subscribeToUserProfile(otherUserId, (profile) => {
         setOtherUser(profile);
       });
-    }
-
-    // Subscribe to typing status of the other user
-    let unsubscribeTyping: (() => void) | undefined;
-    if (otherUserId) {
       unsubscribeTyping = chatService.subscribeToTyping(chatId, otherUserId, (typing) => {
         setIsOtherTyping(typing);
       });
@@ -99,6 +142,8 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
 
     return () => {
       unsubscribeMessages();
+      unsubscribeChat();
+      Object.values(memberUnsubs).forEach(unsub => unsub());
       if (unsubscribeProfile) unsubscribeProfile();
       if (unsubscribeTyping) unsubscribeTyping();
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -141,20 +186,18 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
     await chatService.sendMessage(chatId, user.uid, getUserDisplayName(profile as UserProfile) || user.displayName || 'Anonymous', { text, type: 'text' });
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'file') => {
-    const file = e.target.files?.[0];
+  const uploadSelectedFile = async (file: File, type: 'image' | 'file') => {
     if (!file || !user) return;
 
     try {
       setIsUploading(true);
       setUploadProgress(0);
+      setUploadError(null);
       setShowAttachmentMenu(false);
 
-      let finalUrl = '';
-      
-      setUploadMethod(file.size <= 800 * 1024 ? 'Быстро' : 'Облако');
+      setUploadMethod(type === 'image' ? 'Фото' : 'Файл');
       const path = `chats/${chatId}/${Date.now()}_${file.name}`;
-      finalUrl = await chatService.uploadFile(path, file, (progress) => {
+      const finalUrl = await chatService.uploadFile(path, file, (progress) => {
         setUploadProgress(Math.round(progress));
       });
 
@@ -181,11 +224,34 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
       );
     } catch (error: any) {
       console.error('File upload failed:', error);
-      alert(error.message || 'Ошибка при загрузке файла');
+      setUploadError(error?.message || 'Ошибка при отправке файла');
+      setTimeout(() => setUploadError(null), 4000);
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
-      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'file') => {
+    const file = e.target.files?.[0];
+    if (file) {
+      await uploadSelectedFile(file, type);
+    }
+    if (e.target) e.target.value = '';
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        const file = items[i].getAsFile();
+        if (file) {
+          e.preventDefault();
+          uploadSelectedFile(file, 'image');
+          break;
+        }
+      }
     }
   };
 
@@ -196,13 +262,12 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
     try {
       setIsUploading(true);
       setUploadProgress(0);
+      setUploadError(null);
       
-      let finalUrl = '';
       const fileName = `voice_${Date.now()}.webm`;
-      
       setUploadMethod('Голос');
       const path = `chats/${chatId}/${fileName}`;
-      finalUrl = await chatService.uploadFile(path, recording.blob, (progress) => {
+      const finalUrl = await chatService.uploadFile(path, recording.blob, (progress) => {
         setUploadProgress(Math.round(progress));
       });
 
@@ -218,9 +283,12 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
         }
       );
     } catch (error: any) {
-      alert(error.message || 'Ошибка при отправке голосового сообщения');
+      console.error('Voice upload failed:', error);
+      setUploadError(error?.message || 'Ошибка при отправке голосового сообщения');
+      setTimeout(() => setUploadError(null), 4000);
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -232,12 +300,43 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
     window.dispatchEvent(new CustomEvent('START_CALL', { detail: { callId: newCallId, isCaller: true } }));
   };
 
+  const renderGroupHeaderAvatar = () => {
+    const avatar = currentChat?.groupAvatar;
+    if (avatar?.startsWith('preset:')) {
+      const [, emoji, bg] = avatar.split(':');
+      return (
+        <div className={`w-10 h-10 rounded-2xl ${bg} flex items-center justify-center text-lg shadow-sm border border-white/40 dark:border-white/10 shrink-0`}>
+          {emoji}
+        </div>
+      );
+    }
+    if (avatar) {
+      return (
+        <img src={avatar} alt={currentChat?.groupName} className="w-10 h-10 rounded-2xl object-cover shadow-sm shrink-0" />
+      );
+    }
+    return (
+      <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-sm shrink-0">
+        <Users className="w-5 h-5" />
+      </div>
+    );
+  };
+
+  const isGroup = !!currentChat?.isGroup;
+  const onlineCount = (Object.values(groupMembersMap) as UserProfile[]).filter(m => m?.status === 'online').length;
+
   return (
     <div className="flex-1 flex flex-col bg-white dark:bg-[#0d0d0d] overflow-hidden transition-colors duration-500">
       {/* Header */}
       <div 
         className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-[#222] bg-white/80 dark:bg-[#0d0d0d]/80 backdrop-blur-md z-10 cursor-pointer group flex-shrink-0"
-        onClick={() => { if (otherUser) setShowProfile(true); }}
+        onClick={() => { 
+          if (isGroup) {
+            setShowGroupInfo(true);
+          } else if (otherUser) {
+            setShowProfile(true); 
+          }
+        }}
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <button
@@ -249,16 +348,29 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
           >
             <ChevronLeft className="w-6 h-6" />
           </button>
-          <Avatar 
-            src={otherUser?.photoURL} 
-            className="w-10 h-10 border border-gray-100 dark:border-[#333] shadow-sm group-hover:opacity-80 transition-opacity flex-shrink-0" 
-          />
+          
+          {isGroup ? (
+            renderGroupHeaderAvatar()
+          ) : (
+            <Avatar 
+              src={otherUser?.photoURL} 
+              className="w-10 h-10 border border-gray-100 dark:border-[#333] shadow-sm group-hover:opacity-80 transition-opacity flex-shrink-0" 
+            />
+          )}
+
           <div className="flex-1 min-w-0">
             <h2 className="font-medium text-[#1a1a1a] dark:text-white transition-colors truncate">
-              {otherUser ? <UserName user={otherUser} /> : 'Переписка'}
+              {isGroup ? (currentChat.groupName || 'Групповой чат') : (otherUser ? <UserName user={otherUser} /> : 'Переписка')}
             </h2>
             <AnimatePresence mode="wait">
-              {isOtherTyping ? (
+              {isGroup ? (
+                <div className="text-[10px] text-gray-400 font-sans font-medium uppercase tracking-wider flex items-center gap-1.5">
+                  <span>{currentChat.participantIds?.length || 0} участников</span>
+                  {onlineCount > 0 && (
+                    <span className="text-emerald-500 font-semibold">• {onlineCount} в сети</span>
+                  )}
+                </div>
+              ) : isOtherTyping ? (
                 <motion.div 
                   key="typing"
                   initial={{ opacity: 0, y: 5 }}
@@ -290,14 +402,23 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
           </div>
         </div>
         <div className="relative flex items-center">
-          {otherUser?.status === 'online' && (
+          {isGroup ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowGroupInfo(true); }}
+              className="p-2 mr-1 hover:bg-gray-100 dark:hover:bg-[#222] rounded-full transition-colors text-gray-400 hover:text-blue-500"
+              title="Информация о группе"
+            >
+              <Users className="w-5 h-5" />
+            </button>
+          ) : otherUser?.status === 'online' ? (
             <button
               onClick={handleStartCall}
               className="p-2 mr-1 hover:bg-gray-100 dark:hover:bg-[#222] rounded-full transition-colors text-gray-400 hover:text-green-500"
             >
               <Video className="w-5 h-5" />
             </button>
-          )}
+          ) : null}
+
           <button 
             onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
             className="p-2 hover:bg-gray-100 dark:hover:bg-[#222] rounded-full transition-colors text-gray-400"
@@ -318,6 +439,19 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                   exit={{ opacity: 0, scale: 0.95, y: 10 }}
                   className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-[#1a1a1a] rounded-xl shadow-lg border border-gray-100 dark:border-[#333] overflow-hidden z-50 origin-top-right"
                 >
+                  {isGroup && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowMenu(false);
+                        setShowGroupInfo(true);
+                      }}
+                      className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#222] transition-colors flex items-center gap-2 border-b border-gray-100 dark:border-[#2a2a2a]"
+                    >
+                      <Info className="w-4 h-4 text-blue-500" />
+                      О группе
+                    </button>
+                  )}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -327,7 +461,9 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                     className="w-full text-left px-4 py-3 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex items-center gap-2"
                   >
                     <Trash2 className="w-4 h-4" />
-                    Удалить друга
+                    {isGroup 
+                      ? (user?.uid === currentChat?.createdBy ? 'Удалить группу' : 'Покинуть группу') 
+                      : 'Удалить друга'}
                   </button>
                 </motion.div>
               </>
@@ -342,6 +478,16 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {showGroupInfo && currentChat && (
+          <GroupInfoModal
+            chat={currentChat}
+            onClose={() => setShowGroupInfo(false)}
+            onLeaveGroup={() => { if (onClose) onClose(); }}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#fafafa] dark:bg-[#080808] custom-scrollbar">
         {messages.length === 0 ? (
@@ -353,7 +499,21 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
           </div>
         ) : (
           messages.map((msg) => {
+            // System message render
+            if (msg.type === 'system') {
+              return (
+                <div key={msg.id} className="flex justify-center my-2">
+                  <span className="px-3.5 py-1 rounded-full text-xs bg-gray-100 dark:bg-[#1c1c1c] text-gray-600 dark:text-gray-300 border border-gray-200/60 dark:border-[#2e2e2e] shadow-xs text-center font-medium max-w-[90%]">
+                    {msg.text}
+                  </span>
+                </div>
+              );
+            }
+
             const isMe = msg.senderId === user?.uid;
+            const senderProfile = groupMembersMap[msg.senderId];
+            const senderDisplayName = senderProfile?.customName || senderProfile?.displayName || msg.senderName;
+
             return (
               <motion.div
                 layout
@@ -366,9 +526,19 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                 )}
               >
                 {!isMe && (
-                  <span className="text-[10px] text-gray-400 dark:text-gray-600 ml-2 uppercase font-sans">
-                    {otherUser ? <UserName user={otherUser} fallback={msg.senderName} /> : msg.senderName}
-                  </span>
+                  <div className="flex items-center gap-1.5 ml-2">
+                    {isGroup && (
+                      <Avatar 
+                        src={senderProfile?.photoURL} 
+                        className="w-4 h-4 rounded-full border border-gray-200 dark:border-[#333]" 
+                      />
+                    )}
+                    <span className="text-[10px] text-gray-400 dark:text-gray-500 uppercase font-sans font-medium">
+                      {isGroup 
+                        ? senderDisplayName 
+                        : (otherUser ? <UserName user={otherUser} fallback={msg.senderName} /> : msg.senderName)}
+                    </span>
+                  </div>
                 )}
                 <div
                   className={cn(
@@ -394,13 +564,13 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                     msg.text
                   )}
                   <div className={cn(
-                    "flex flex-row items-center justify-end text-[9px] mt-1 opacity-50 font-sans text-right",
-                    isMe ? "text-white dark:text-black" : "text-gray-500"
+                    "flex flex-row items-center justify-end text-[9px] mt-1 font-sans text-right gap-1.5",
+                    isMe ? "text-white/80 dark:text-black/80" : "text-gray-400 dark:text-gray-500"
                   )}>
                     {isMe && (
                       <button 
                         onClick={() => handleDeleteMessage(msg.id)}
-                        className="mr-2 hover:text-red-300 dark:hover:text-red-600 transition-colors cursor-pointer"
+                        className="mr-1 hover:text-red-300 dark:hover:text-red-600 transition-colors cursor-pointer"
                         title="Удалить сообщение"
                         type="button"
                       >
@@ -408,10 +578,18 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                       </button>
                     )}
                     <span>{msg.timestamp && format(msg.timestamp.toDate(), 'HH:mm', { locale: ru })}</span>
+                    {isMe && (
+                      <MessageStatusIndicator
+                        message={msg}
+                        currentUserId={user.uid}
+                        totalParticipants={currentChat?.participantIds?.length || 2}
+                        isDarkBubble={isMe}
+                      />
+                    )}
                   </div>
                 </div>
               </motion.div>
-            )
+            );
           })
         )}
         {isOtherTyping && (
@@ -429,6 +607,20 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
 
       {/* Input */}
       <div className="p-4 bg-white dark:bg-[#0d0d0d] border-t border-gray-100 dark:border-[#222] transition-colors relative">
+        {uploadError && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="mb-2 p-2.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 rounded-xl text-xs text-red-600 dark:text-red-400 flex items-center justify-between"
+          >
+            <span>{uploadError}</span>
+            <button type="button" onClick={() => setUploadError(null)} className="p-0.5 hover:text-red-700 dark:hover:text-red-300">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </motion.div>
+        )}
+
         {isUploading && (
           <div className="absolute bottom-full left-0 right-0 bg-white/90 dark:bg-[#0d0d0d]/90 backdrop-blur-sm px-4 py-2 border-t border-gray-100 dark:border-[#222] flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-2">
@@ -497,6 +689,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
               type="text"
               value={input}
               onChange={handleInputChange}
+              onPaste={handlePaste}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
@@ -535,28 +728,17 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                         className="w-full text-left px-4 py-3 text-sm text-white flex items-center gap-3 hover:bg-gray-800 dark:hover:bg-[#222] transition-colors border-b border-gray-800 dark:border-[#222]"
                       >
                         <ImageIcon className="w-5 h-5 text-blue-400" />
-                        <span className="font-medium">Фото или Видео</span>
+                        <span className="font-medium">Фото или видео</span>
                       </button>
                       <button 
                         type="button"
                         onClick={() => { fileInputRef.current?.click(); setShowAttachmentMenu(false); }}
-                        className="w-full text-left px-4 py-3 text-sm text-white flex items-center gap-3 hover:bg-gray-800 dark:hover:bg-[#222] transition-colors border-b border-gray-800 dark:border-[#222]"
+                        className="w-full text-left px-4 py-3 text-sm text-white flex items-center gap-3 hover:bg-gray-800 dark:hover:bg-[#222] transition-colors"
                       >
-                        <Cloud className="w-5 h-5 text-purple-400" />
+                        <FileIcon className="w-5 h-5 text-purple-400" />
                         <div className="flex flex-col">
-                           <span className="font-medium">Файл (Облако)</span>
-                           <span className="text-[10px] text-gray-400">Надежно через сервер</span>
-                        </div>
-                      </button>
-                      <button 
-                        type="button"
-                        disabled={true}
-                        className="w-full text-left px-4 py-3 text-sm text-white flex items-center gap-3 transition-colors opacity-50 cursor-not-allowed"
-                      >
-                        <Share2 className="w-5 h-5 text-green-400" />
-                        <div className="flex flex-col">
-                           <span className="font-medium">Файл (P2P)</span>
-                           <span className="text-[10px] text-green-400/80">В разработке (будущие возможности)</span>
+                           <span className="font-medium">Документ / Файл</span>
+                           <span className="text-[10px] text-gray-400">PDF, документы, архивы</span>
                         </div>
                       </button>
                     </motion.div>

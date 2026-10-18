@@ -70,41 +70,39 @@ export const chatService = {
     }, (error) => handleFirestoreError(error, 'list', `chats/${chatId}/messages`));
   },
   
-  // Upload file (via server proxy /api/upload or Data URL for voice and small files)
-  uploadFile: async (path: string, file: Blob | File, onProgress?: (progress: number) => void) => {
+  // Upload file (via server endpoint /api/upload)
+  uploadFile: async (_path: string, file: Blob | File, onProgress?: (progress: number) => void) => {
     try {
-      // 1. Voice notes and small files (< 800 KB) convert directly to Data URL for instant delivery
-      if (file.size <= 800 * 1024 || (file as File).name?.startsWith('voice_') || file.type.startsWith('audio/')) {
-        return new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            if (onProgress) onProgress(100);
-            resolve(reader.result as string);
-          };
-          reader.onerror = (err) => reject(err);
-          reader.readAsDataURL(file);
-        });
-      }
+      if (onProgress) onProgress(10);
 
-      // 2. Larger files send to our server upload endpoint /api/upload
       return new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
+        
+        reader.onprogress = (e) => {
+          if (e.lengthComputable && onProgress) {
+            const percent = Math.min(60, Math.round((e.loaded / e.total) * 60));
+            onProgress(percent);
+          }
+        };
+
         reader.onload = async () => {
           try {
+            if (onProgress) onProgress(65);
             const base64Data = reader.result as string;
-            if (onProgress) onProgress(30);
+
+            const filename = (file as File).name || (file.type.startsWith('audio/') ? `voice_${Date.now()}.webm` : 'file.bin');
 
             const response = await fetch('/api/upload', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                filename: (file as File).name || 'file.bin',
+                filename,
                 mimeType: file.type || 'application/octet-stream',
                 fileData: base64Data
               })
             });
 
-            if (onProgress) onProgress(80);
+            if (onProgress) onProgress(90);
 
             if (!response.ok) {
               const errJson = await response.json().catch(() => ({}));
@@ -116,12 +114,20 @@ export const chatService = {
               if (onProgress) onProgress(100);
               resolve(resJson.url);
             } else {
-              throw new Error('Некорректный ответ сервера загрузки');
+              throw new Error('Некорректный ответ сервера при загрузке');
             }
-          } catch (err) {
+          } catch (err: any) {
+            // If server route failed but it's a tiny voice recording (< 100 KB), allow fallback
+            if (file.size < 100 * 1024 && (file.type.startsWith('audio/') || (file as File).name?.startsWith('voice_'))) {
+              if (reader.result) {
+                if (onProgress) onProgress(100);
+                return resolve(reader.result as string);
+              }
+            }
             reject(err);
           }
         };
+
         reader.onerror = (err) => reject(err);
         reader.readAsDataURL(file);
       });
@@ -143,7 +149,9 @@ export const chatService = {
         senderId,
         senderName,
         timestamp,
-        type: data.type || 'text'
+        type: data.type || 'text',
+        readBy: [senderId],
+        deliveredTo: [senderId]
       };
       
       if (data.text) messageData.text = data.text;
@@ -166,11 +174,182 @@ export const chatService = {
       await updateDoc(chatRef, {
         lastMessage: lastMessageText,
         lastMessageSenderId: senderId,
+        lastMessageSenderName: senderName,
         updatedAt: timestamp
       });
     } catch (error) {
       handleFirestoreError(error, 'create', `chats/${chatId}/messages`);
     }
+  },
+
+  // Mark messages as read by current user
+  markMessagesAsRead: async (chatId: string, currentUserId: string, messages: Message[]) => {
+    try {
+      const unreadMessages = messages.filter(
+        msg => msg.id && msg.senderId !== currentUserId && (!msg.readBy || !msg.readBy.includes(currentUserId))
+      );
+
+      if (unreadMessages.length === 0) return;
+
+      const updatePromises = unreadMessages.map(async (msg) => {
+        try {
+          const msgRef = doc(db, 'chats', chatId, 'messages', msg.id);
+          const currentReadBy = Array.isArray(msg.readBy) ? msg.readBy : [];
+          const currentDeliveredTo = Array.isArray(msg.deliveredTo) ? msg.deliveredTo : [];
+          
+          const newReadBy = currentReadBy.includes(currentUserId) ? currentReadBy : [...currentReadBy, currentUserId];
+          const newDeliveredTo = currentDeliveredTo.includes(currentUserId) ? currentDeliveredTo : [...currentDeliveredTo, currentUserId];
+          
+          await updateDoc(msgRef, {
+            readBy: newReadBy,
+            deliveredTo: newDeliveredTo
+          });
+        } catch (err) {
+          console.warn('Failed to mark message as read:', msg.id, err);
+        }
+      });
+
+      await Promise.all(updatePromises);
+    } catch (e) {
+      console.warn('Error marking messages as read:', e);
+    }
+  },
+
+  // Mark messages as delivered to current user
+  markMessagesAsDelivered: async (chatId: string, currentUserId: string, messages: Message[]) => {
+    try {
+      const undeliveredMessages = messages.filter(
+        msg => msg.id && msg.senderId !== currentUserId && (!msg.deliveredTo || !msg.deliveredTo.includes(currentUserId))
+      );
+
+      if (undeliveredMessages.length === 0) return;
+
+      const updatePromises = undeliveredMessages.map(async (msg) => {
+        try {
+          const msgRef = doc(db, 'chats', chatId, 'messages', msg.id);
+          const currentDeliveredTo = Array.isArray(msg.deliveredTo) ? msg.deliveredTo : [];
+          if (!currentDeliveredTo.includes(currentUserId)) {
+            await updateDoc(msgRef, {
+              deliveredTo: [...currentDeliveredTo, currentUserId]
+            });
+          }
+        } catch (err) {
+          console.warn('Failed to mark message as delivered:', msg.id, err);
+        }
+      });
+
+      await Promise.all(updatePromises);
+    } catch (e) {
+      console.warn('Error marking messages as delivered:', e);
+    }
+  },
+
+  // Create a new group chat
+  createGroupChat: async (
+    currentUserId: string,
+    creatorName: string,
+    groupName: string,
+    groupAvatar: string,
+    memberUserIds: string[]
+  ): Promise<string> => {
+    try {
+      const allParticipantIds = Array.from(new Set([currentUserId, ...memberUserIds]));
+      const chatId = `group_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      const chatRef = doc(db, 'chats', chatId);
+
+      const timestamp = serverTimestamp();
+      await setDoc(chatRef, {
+        isGroup: true,
+        groupName: groupName.trim(),
+        groupAvatar: groupAvatar || '',
+        createdBy: currentUserId,
+        adminIds: [currentUserId],
+        participantIds: allParticipantIds,
+        lastMessage: `Группа «${groupName.trim()}» создана`,
+        lastMessageSenderId: currentUserId,
+        lastMessageSenderName: creatorName,
+        updatedAt: timestamp
+      });
+
+      // Add system message into the chat
+      const messagesRef = collection(db, 'chats', chatId, 'messages');
+      await addDoc(messagesRef, {
+        senderId: currentUserId,
+        senderName: creatorName,
+        timestamp,
+        type: 'system',
+        text: `${creatorName} создал(а) группу «${groupName.trim()}»`,
+        readBy: [currentUserId],
+        deliveredTo: [currentUserId]
+      });
+
+      return chatId;
+    } catch (error) {
+      handleFirestoreError(error, 'create', 'chats');
+      throw error;
+    }
+  },
+
+  // Update group chat info (e.g. name, avatar, or participants)
+  updateGroupChat: async (
+    chatId: string,
+    data: {
+      groupName?: string;
+      groupAvatar?: string;
+      participantIds?: string[];
+      adminIds?: string[];
+      systemMessage?: string;
+      senderId?: string;
+      senderName?: string;
+    }
+  ) => {
+    try {
+      const chatRef = doc(db, 'chats', chatId);
+      const updateData: any = {
+        updatedAt: serverTimestamp()
+      };
+      if (data.groupName !== undefined) updateData.groupName = data.groupName.trim();
+      if (data.groupAvatar !== undefined) updateData.groupAvatar = data.groupAvatar;
+      if (data.participantIds !== undefined) updateData.participantIds = data.participantIds;
+      if (data.adminIds !== undefined) updateData.adminIds = data.adminIds;
+      if (data.systemMessage) {
+        updateData.lastMessage = data.systemMessage;
+        updateData.lastMessageSenderId = data.senderId;
+        updateData.lastMessageSenderName = data.senderName;
+      }
+
+      await updateDoc(chatRef, updateData);
+
+      if (data.systemMessage && data.senderId) {
+        const messagesRef = collection(db, 'chats', chatId, 'messages');
+        await addDoc(messagesRef, {
+          senderId: data.senderId,
+          senderName: data.senderName || 'Система',
+          timestamp: serverTimestamp(),
+          type: 'system',
+          text: data.systemMessage,
+          readBy: [data.senderId],
+          deliveredTo: [data.senderId]
+        });
+      }
+    } catch (error) {
+      handleFirestoreError(error, 'update', `chats/${chatId}`);
+      throw error;
+    }
+  },
+
+  // Subscribe to single chat document
+  subscribeToChat: (chatId: string, callback: (chat: Chat | null) => void) => {
+    const chatRef = doc(db, 'chats', chatId);
+    return onSnapshot(chatRef, (docSnap) => {
+      if (docSnap.exists()) {
+        callback({ id: docSnap.id, ...docSnap.data() } as Chat);
+      } else {
+        callback(null);
+      }
+    }, (error) => {
+      console.warn('Error subscribing to chat:', error);
+    });
   },
 
   // Find or create a chat with another user

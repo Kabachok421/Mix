@@ -23,23 +23,12 @@ export function FileMessage({ type, url, thumbnail, fileName, fileSize, isMe }: 
   };
 
   if (type === 'image') {
-    const isGoFile = url?.includes('gofile.io');
-    
-    if (isGoFile && !thumbnail) {
-      return (
-        <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 underline hover:opacity-80">
-          <ImageIcon className="w-4 h-4" />
-          <span>{fileName || 'Фотография (GoFile)'}</span>
-        </a>
-      );
-    }
-
-    const imageSrc = isGoFile ? thumbnail : (url || thumbnail);
+    const imageSrc = url || thumbnail;
 
     return (
       <>
         <div className="max-w-full rounded-lg overflow-hidden cursor-pointer" onClick={() => setIsFullscreen(true)}>
-          <img src={imageSrc} alt={fileName || 'Image'} className="max-h-60 object-contain w-full hover:opacity-95 transition-opacity bg-black/10 dark:bg-white/5" />
+          <img src={imageSrc} alt={fileName || 'Image'} className="max-h-60 object-contain w-full hover:opacity-95 transition-opacity bg-black/10 dark:bg-white/5 rounded-lg" />
         </div>
 
         {createPortal(
@@ -61,19 +50,23 @@ export function FileMessage({ type, url, thumbnail, fileName, fileSize, isMe }: 
                 {imageSrc ? (
                   <motion.img 
                     initial={{ scale: 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.9, opacity: 0 }}
-                  transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                  src={imageSrc} 
-                  alt={fileName || 'Image fullscreen'} 
-                  className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl cursor-default"
-                  onClick={(e) => e.stopPropagation()}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.9, opacity: 0 }}
+                    transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                    src={imageSrc} 
+                    alt={fileName || 'Image fullscreen'} 
+                    className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl cursor-default"
+                    onClick={(e) => e.stopPropagation()}
                   />
                 ) : (
                   <div className="text-white p-4 bg-black/50 rounded-lg">Изображение недоступно</div>
                 )}
                 
-                <a href={url || '#'} target="_blank" rel="noopener noreferrer" download={fileName || 'download'}
+                <a 
+                  href={url?.startsWith('/api/files/') ? `${url}?download=true` : (url || '#')} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  download={fileName || 'image.jpg'}
                   onClick={(e) => e.stopPropagation()}
                   className="absolute bottom-6 right-6 flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-colors z-[201]"
                 >
@@ -89,16 +82,19 @@ export function FileMessage({ type, url, thumbnail, fileName, fileSize, isMe }: 
     );
   }
 
+  const downloadUrl = url?.startsWith('/api/files/') ? `${url}?download=true` : url;
+
   return (
     <a 
-      href={url} 
+      href={downloadUrl || '#'} 
+      download={fileName || 'file'}
       target="_blank" 
       rel="noopener noreferrer"
       className={`flex items-center gap-3 p-2 rounded-xl transition-colors ${
         isMe ? 'hover:bg-white/10' : 'hover:bg-gray-100 dark:hover:bg-white/5'
       }`}
     >
-      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
         isMe ? 'bg-white/20' : 'bg-blue-50 dark:bg-blue-900/20 text-blue-500'
       }`}>
         <File className="w-5 h-5" />
@@ -111,7 +107,7 @@ export function FileMessage({ type, url, thumbnail, fileName, fileSize, isMe }: 
           {formatSize(fileSize)}
         </div>
       </div>
-      <Download className={`w-4 h-4 ${isMe ? 'text-white/70' : 'text-gray-400'}`} />
+      <Download className={`w-4 h-4 shrink-0 ${isMe ? 'text-white/70' : 'text-gray-400'}`} />
     </a>
   );
 }
