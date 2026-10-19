@@ -22,13 +22,65 @@ export function FileMessage({ type, url, thumbnail, fileName, fileSize, isMe }: 
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const [hasImageError, setHasImageError] = useState(false);
+
   if (type === 'image') {
+    const isVideo = fileName?.match(/\.(mp4|webm|mov|ogg)$/i);
+    if (isVideo) {
+      return (
+        <div className="max-w-full rounded-lg overflow-hidden bg-black/5 dark:bg-white/5">
+          <video src={url} controls className="max-h-72 w-full rounded-lg object-contain" />
+          {fileName && (
+            <div className={`p-1.5 text-xs flex justify-between items-center ${isMe ? 'text-white/80' : 'text-gray-600 dark:text-gray-300'}`}>
+              <span className="truncate max-w-[200px]">{fileName}</span>
+              <span>{formatSize(fileSize)}</span>
+            </div>
+          )}
+        </div>
+      );
+    }
+
     const imageSrc = url || thumbnail;
+
+    if (hasImageError || !imageSrc) {
+      const downloadUrl = url?.startsWith('/api/files/') ? `${url}?download=true` : url;
+      return (
+        <a 
+          href={downloadUrl || '#'} 
+          download={fileName || 'image.jpg'} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className={`flex items-center gap-3 p-2 rounded-xl transition-colors ${
+            isMe ? 'hover:bg-white/10' : 'hover:bg-gray-100 dark:hover:bg-white/5'
+          }`}
+        >
+          <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+            isMe ? 'bg-white/20' : 'bg-blue-50 dark:bg-blue-900/20 text-blue-500'
+          }`}>
+            <ImageIcon className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className={`text-sm font-medium truncate ${isMe ? 'text-white' : 'text-gray-800 dark:text-gray-200'}`}>
+              {fileName || 'Изображение'}
+            </div>
+            <div className={`text-[10px] ${isMe ? 'text-white/70' : 'text-gray-400'}`}>
+              {formatSize(fileSize)}
+            </div>
+          </div>
+          <Download className={`w-4 h-4 shrink-0 ${isMe ? 'text-white/70' : 'text-gray-400'}`} />
+        </a>
+      );
+    }
 
     return (
       <>
         <div className="max-w-full rounded-lg overflow-hidden cursor-pointer" onClick={() => setIsFullscreen(true)}>
-          <img src={imageSrc} alt={fileName || 'Image'} className="max-h-60 object-contain w-full hover:opacity-95 transition-opacity bg-black/10 dark:bg-white/5 rounded-lg" />
+          <img 
+            src={imageSrc} 
+            alt={fileName || 'Image'} 
+            onError={() => setHasImageError(true)}
+            className="max-h-60 object-contain w-full hover:opacity-95 transition-opacity bg-black/10 dark:bg-white/5 rounded-lg" 
+          />
         </div>
 
         {createPortal(
@@ -63,7 +115,7 @@ export function FileMessage({ type, url, thumbnail, fileName, fileSize, isMe }: 
                 )}
                 
                 <a 
-                  href={url?.startsWith('/api/files/') ? `${url}?download=true` : (url || '#')} 
+                  href={url?.startsWith('/api/files/') ? `${url}?download=true&downloadName=${encodeURIComponent(fileName || 'image.jpg')}` : (url || '#')} 
                   target="_blank" 
                   rel="noopener noreferrer" 
                   download={fileName || 'image.jpg'}
@@ -82,7 +134,9 @@ export function FileMessage({ type, url, thumbnail, fileName, fileSize, isMe }: 
     );
   }
 
-  const downloadUrl = url?.startsWith('/api/files/') ? `${url}?download=true` : url;
+  const downloadUrl = url?.startsWith('/api/files/') 
+    ? `${url}?download=true&downloadName=${encodeURIComponent(fileName || 'file')}` 
+    : url;
 
   return (
     <a 

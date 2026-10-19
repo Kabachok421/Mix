@@ -70,70 +70,101 @@ export const chatService = {
     }, (error) => handleFirestoreError(error, 'list', `chats/${chatId}/messages`));
   },
   
-  // Upload file (via server endpoint /api/upload)
+  // Upload file (via server endpoint /api/upload-raw or /api/upload)
   uploadFile: async (_path: string, file: Blob | File, onProgress?: (progress: number) => void) => {
+    const filename = (file as File).name || (file.type.startsWith('audio/') ? `voice_${Date.now()}.webm` : 'file.bin');
+    const mimeType = file.type || 'application/octet-stream';
+
+    // Primary: direct binary stream upload via /api/upload-raw
     try {
-      if (onProgress) onProgress(10);
+      if (onProgress) onProgress(5);
 
-      return new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        
-        reader.onprogress = (e) => {
-          if (e.lengthComputable && onProgress) {
-            const percent = Math.min(60, Math.round((e.loaded / e.total) * 60));
-            onProgress(percent);
-          }
-        };
+      return await new Promise<string>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `/api/upload-raw?filename=${encodeURIComponent(filename)}&mimeType=${encodeURIComponent(mimeType)}`);
+        xhr.setRequestHeader('Content-Type', mimeType);
 
-        reader.onload = async () => {
-          try {
-            if (onProgress) onProgress(65);
-            const base64Data = reader.result as string;
-
-            const filename = (file as File).name || (file.type.startsWith('audio/') ? `voice_${Date.now()}.webm` : 'file.bin');
-
-            const response = await fetch('/api/upload', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                filename,
-                mimeType: file.type || 'application/octet-stream',
-                fileData: base64Data
-              })
-            });
-
-            if (onProgress) onProgress(90);
-
-            if (!response.ok) {
-              const errJson = await response.json().catch(() => ({}));
-              throw new Error(errJson.error || `Ошибка сервера: HTTP ${response.status}`);
+        if (xhr.upload && onProgress) {
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              const percent = Math.min(99, Math.round((e.loaded / e.total) * 100));
+              onProgress(percent);
             }
+          };
+        }
 
-            const resJson = await response.json();
-            if (resJson?.url) {
-              if (onProgress) onProgress(100);
-              resolve(resJson.url);
-            } else {
-              throw new Error('Некорректный ответ сервера при загрузке');
-            }
-          } catch (err: any) {
-            // If server route failed but it's a tiny voice recording (< 100 KB), allow fallback
-            if (file.size < 100 * 1024 && (file.type.startsWith('audio/') || (file as File).name?.startsWith('voice_'))) {
-              if (reader.result) {
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const resJson = JSON.parse(xhr.responseText);
+              if (resJson?.url) {
                 if (onProgress) onProgress(100);
-                return resolve(reader.result as string);
+                resolve(resJson.url);
+              } else {
+                reject(new Error('Некорректный ответ сервера'));
               }
+            } catch {
+              reject(new Error('Ошибка парсинга ответа сервера'));
             }
-            reject(err);
+          } else {
+            try {
+              const resJson = JSON.parse(xhr.responseText);
+              reject(new Error(resJson.error || `HTTP ${xhr.status}`));
+            } catch {
+              reject(new Error(`Ошибка сервера: HTTP ${xhr.status}`));
+            }
           }
         };
 
-        reader.onerror = (err) => reject(err);
-        reader.readAsDataURL(file);
+        xhr.onerror = () => {
+          reject(new Error('Сетевая ошибка при загрузке файла'));
+        };
+
+        xhr.send(file);
       });
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      throw error;
+    } catch (primaryErr) {
+      console.warn('Stream upload failed, attempting fallback to base64 JSON upload:', primaryErr);
+      
+      // Secondary fallback: base64 upload
+      try {
+        const base64Data = await new Promise<string>((res, rej) => {
+          const reader = new FileReader();
+          reader.onload = () => res(reader.result as string);
+          reader.onerror = rej;
+          reader.readAsDataURL(file);
+        });
+
+        const resp = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename, mimeType, fileData: base64Data })
+        });
+
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data?.url) {
+            if (onProgress) onProgress(100);
+            return data.url;
+          }
+        }
+      } catch (fallbackErr) {
+        console.warn('Base64 upload also failed:', fallbackErr);
+      }
+
+      // Final fallback for small files (< 600 KB): return data URL directly so message is delivered
+      if (file.size < 600 * 1024) {
+        return new Promise<string>((res, rej) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (onProgress) onProgress(100);
+            res(reader.result as string);
+          };
+          reader.onerror = () => rej(primaryErr);
+          reader.readAsDataURL(file);
+        });
+      }
+
+      throw primaryErr;
     }
   },
 

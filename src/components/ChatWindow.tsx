@@ -46,6 +46,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadMethod, setUploadMethod] = useState('');
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [p2pFiles, setP2pFiles] = useState<Record<string, string>>({});
   const { isRecording, duration, startRecording, stopRecording, cancelRecording } = useVoiceRecorder();
 
@@ -196,17 +197,16 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
       setShowAttachmentMenu(false);
 
       setUploadMethod(type === 'image' ? 'Фото' : 'Файл');
-      const path = `chats/${chatId}/${Date.now()}_${file.name}`;
-      const finalUrl = await chatService.uploadFile(path, file, (progress) => {
+      const finalUrl = await chatService.uploadFile('', file, (progress) => {
         setUploadProgress(Math.round(progress));
       });
 
-      let thumbnail = undefined;
-      if (type === 'image') {
+      let thumbnail: string | undefined = undefined;
+      if (type === 'image' && file.type.startsWith('image/')) {
         try {
           thumbnail = await generateThumbnail(file);
         } catch (e) {
-          console.error('Failed to generate thumbnail', e);
+          console.warn('Could not generate thumbnail', e);
         }
       }
 
@@ -225,7 +225,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
     } catch (error: any) {
       console.error('File upload failed:', error);
       setUploadError(error?.message || 'Ошибка при отправке файла');
-      setTimeout(() => setUploadError(null), 4000);
+      setTimeout(() => setUploadError(null), 5000);
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -234,10 +234,10 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'file') => {
     const file = e.target.files?.[0];
+    if (e.target) e.target.value = '';
     if (file) {
       await uploadSelectedFile(file, type);
     }
-    if (e.target) e.target.value = '';
   };
 
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
@@ -489,7 +489,33 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
       </AnimatePresence>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#fafafa] dark:bg-[#080808] custom-scrollbar">
+      <div 
+        className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#fafafa] dark:bg-[#080808] custom-scrollbar relative"
+        onDragOver={(e) => { e.preventDefault(); setIsDraggingOver(true); }}
+        onDragLeave={(e) => { 
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+            setIsDraggingOver(false); 
+          }
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsDraggingOver(false);
+          const file = e.dataTransfer.files?.[0];
+          if (file) {
+            uploadSelectedFile(file, file.type.startsWith('image/') ? 'image' : 'file');
+          }
+        }}
+      >
+        {isDraggingOver && (
+          <div className="absolute inset-0 z-30 bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-xs border-2 border-dashed border-blue-500 rounded-xl flex flex-col items-center justify-center gap-3 m-3 pointer-events-none">
+            <div className="w-14 h-14 rounded-full bg-blue-500 text-white flex items-center justify-center shadow-lg animate-bounce">
+              <Paperclip className="w-7 h-7" />
+            </div>
+            <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+              Отпустите файл здесь для отправки
+            </p>
+          </div>
+        )}
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-gray-300 dark:text-gray-700 gap-4">
             <div className="w-20 h-20 rounded-full bg-gray-50 dark:bg-[#111] flex items-center justify-center border border-gray-100 dark:border-[#222] shadow-inner">
@@ -773,23 +799,24 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                 <Mic className="w-4 h-4" />
               </button>
             )}
-
-            <input 
-              type="file" 
-              ref={imageInputRef} 
-              onChange={(e) => handleFileUpload(e, 'image')} 
-              accept="image/*" 
-              className="hidden" 
-            />
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              onChange={(e) => handleFileUpload(e, 'file')} 
-              className="hidden" 
-            />
           </form>
         )}
       </div>
+
+      {/* Permanently mounted file inputs */}
+      <input 
+        type="file" 
+        ref={imageInputRef} 
+        onChange={(e) => handleFileUpload(e, 'image')} 
+        accept="image/*,video/*" 
+        className="hidden" 
+      />
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={(e) => handleFileUpload(e, 'file')} 
+        className="hidden" 
+      />
     </div>
   );
 }
