@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Avatar } from './Avatar';
 import { UserName } from './UserName';
 import { UserStatus } from './UserStatus';
-import { getUserDisplayName } from '../lib/utils';
+import { getUserDisplayName, isUserOnline, formatLastSeen } from '../lib/utils';
 
 interface GroupInfoModalProps {
   chat: Chat;
@@ -412,10 +412,10 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({ chat, onClose, o
                           ) : null}
                         </div>
                         <div className="text-[11px] text-gray-400">
-                          {member?.status === 'online' ? (
+                          {isUserOnline(member) ? (
                             <span className="text-emerald-500 font-medium">в сети</span>
                           ) : (
-                            <span>не в сети</span>
+                            <span>{formatLastSeen(member?.lastSeen)}</span>
                           )}
                         </div>
                       </div>

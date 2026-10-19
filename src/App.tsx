@@ -8,7 +8,8 @@ import UserSearch from './components/UserSearch';
 import SetupProfile from './components/SetupProfile';
 import AdminPanel from './components/AdminPanel';
 import { CreateGroupModal } from './components/CreateGroupModal';
-import { LogOut, MessageSquare, Settings, User as UserIcon, Moon, Sun, X, Shield, Bell, Users, Plus } from 'lucide-react';
+import { ChangelogModal } from './components/ChangelogModal';
+import { LogOut, MessageSquare, Settings, User as UserIcon, Moon, Sun, X, Shield, Bell, Users, Plus, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 
@@ -28,12 +29,24 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState<'profile' | 'admin'>('profile');
+  const [appVersionName, setAppVersionName] = useState<string>('Mix Messenger v1.1');
+  const [showChangelog, setShowChangelog] = useState(false);
   
   const isAdmin = user?.email === 'kko593764@gmail.com';
 
   const lastKnownTimestampsRef = useRef<Record<string, number>>({});
   const isInitialLoadRef = useRef(true);
   const userProfilesCacheRef = useRef<Record<string, UserProfile>>({});
+
+  // Real-time app version name listener
+  useEffect(() => {
+    const unsubConfig = chatService.subscribeToAppConfig((cfg) => {
+      if (cfg?.versionName) {
+        setAppVersionName(cfg.versionName);
+      }
+    });
+    return () => unsubConfig();
+  }, []);
 
   // When activeChatId changes or window gets focus, clear title flashing
   useEffect(() => {
@@ -313,8 +326,22 @@ export default function App() {
                   </div>
 
                   <NotificationSettings />
+
+                  {/* What's New Button */}
+                  <button
+                    onClick={() => setShowChangelog(true)}
+                    className="w-full flex items-center justify-between p-3 rounded-2xl border border-gray-200 dark:border-[#333] hover:bg-gray-50 dark:hover:bg-[#202020] transition-all text-xs font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Sparkles className="w-4 h-4 text-amber-500" />
+                      <span>Что нового в мессенджере</span>
+                    </div>
+                    <span className="text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full font-bold">
+                      Обновления
+                    </span>
+                  </button>
                   
-                  <div className="hidden md:block mt-auto pt-8">
+                  <div className="hidden md:block mt-auto pt-6">
                     {isAdmin && (
                       <button
                         onClick={() => setActiveSettingsTab(activeSettingsTab === 'admin' ? 'profile' : 'admin')}
@@ -327,7 +354,13 @@ export default function App() {
                         {activeSettingsTab === 'admin' ? 'Вернуться в профиль' : 'Админ-панель'}
                       </button>
                     )}
-                    <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center md:text-left">Mix Messenger v1.1</p>
+                    <button
+                      onClick={() => setShowChangelog(true)}
+                      className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 uppercase tracking-widest text-center md:text-left transition-colors cursor-pointer w-full text-left"
+                      title="Нажмите, чтобы посмотреть историю обновлений"
+                    >
+                      {appVersionName}
+                    </button>
                   </div>
                 </div>
 
@@ -356,7 +389,12 @@ export default function App() {
                       {activeSettingsTab === 'admin' ? 'Профиль' : 'Админ-панель'}
                     </button>
                   )}
-                  <p className="text-[10px] text-gray-400 uppercase tracking-widest text-center">Mix Messenger v1.1</p>
+                  <button
+                    onClick={() => setShowChangelog(true)}
+                    className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 uppercase tracking-widest text-center w-full"
+                  >
+                    {appVersionName}
+                  </button>
                 </div>
               </div>
             </motion.div>
@@ -371,6 +409,16 @@ export default function App() {
             onGroupCreated={(newChatId) => {
               setActiveChatId(newChatId);
             }}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showChangelog && (
+          <ChangelogModal
+            isOpen={showChangelog}
+            onClose={() => setShowChangelog(false)}
+            appVersionName={appVersionName}
           />
         )}
       </AnimatePresence>

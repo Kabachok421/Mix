@@ -15,7 +15,7 @@ import {
   limit
 } from 'firebase/firestore';
 import { db, auth, handleFirestoreError } from '../lib/firebase';
-import { Chat, Message, UserProfile } from '../types';
+import { Chat, Message, UserProfile, AppConfig, ChangelogItem } from '../types';
 
 export const chatService = {
   // Get active chats for current user
@@ -573,6 +573,167 @@ export const chatService = {
       await deleteDoc(chatRef);
     } catch (error) {
       handleFirestoreError(error, 'delete', `chats/${chatId}`);
+    }
+  },
+
+  deleteUserAdmin: async (userId: string) => {
+    try {
+      const userRef = doc(db, 'users', userId);
+      await deleteDoc(userRef);
+    } catch (error) {
+      handleFirestoreError(error, 'delete', `users/${userId}`);
+    }
+  },
+
+  getAllGroupChats: async (): Promise<Chat[]> => {
+    try {
+      const q = query(collection(db, 'chats'), limit(300));
+      const snapshot = await getDocs(q);
+      const chats = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() } as Chat))
+        .filter(c => c.isGroup);
+      return chats;
+    } catch (error) {
+      handleFirestoreError(error, 'list', 'chats');
+      return [];
+    }
+  },
+
+  getAppConfig: async (): Promise<AppConfig | null> => {
+    try {
+      const configRef = doc(db, 'app_config', 'global');
+      const snap = await getDoc(configRef);
+      if (snap.exists()) {
+        return snap.data() as AppConfig;
+      }
+      return null;
+    } catch (error) {
+      console.warn("Failed to get app config:", error);
+      return null;
+    }
+  },
+
+  updateAppConfig: async (config: Partial<AppConfig>) => {
+    try {
+      const configRef = doc(db, 'app_config', 'global');
+      await setDoc(configRef, {
+        ...config,
+        updatedAt: serverTimestamp(),
+        updatedBy: auth.currentUser?.email || auth.currentUser?.uid || 'admin'
+      }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, 'update', 'app_config/global');
+    }
+  },
+
+  subscribeToAppConfig: (callback: (config: AppConfig | null) => void) => {
+    const configRef = doc(db, 'app_config', 'global');
+    return onSnapshot(configRef, (snap) => {
+      if (snap.exists()) {
+        callback(snap.data() as AppConfig);
+      } else {
+        callback(null);
+      }
+    }, (error) => {
+      console.warn("App config listener error:", error);
+    });
+  },
+
+  getChangelogs: async (): Promise<ChangelogItem[]> => {
+    try {
+      const q = query(
+        collection(db, 'changelogs'),
+        orderBy('createdAt', 'desc'),
+        limit(50)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as ChangelogItem));
+    } catch (error) {
+      handleFirestoreError(error, 'list', 'changelogs');
+      return [];
+    }
+  },
+
+  subscribeToChangelogs: (callback: (items: ChangelogItem[]) => void) => {
+    const q = query(
+      collection(db, 'changelogs'),
+      orderBy('createdAt', 'desc'),
+      limit(50)
+    );
+    return onSnapshot(q, (snap) => {
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as ChangelogItem));
+      callback(items);
+    }, (error) => {
+      console.warn("Changelogs listener error:", error);
+    });
+  },
+
+  addChangelog: async (data: { version: string; title: string; content: string; authorName?: string; broadcastToChats?: boolean }) => {
+    try {
+      const changelogCol = collection(db, 'changelogs');
+      const docRef = await addDoc(changelogCol, {
+        version: data.version.trim(),
+        title: data.title.trim(),
+        content: data.content.trim(),
+        authorName: data.authorName || 'Администрация',
+        createdBy: auth.currentUser?.uid || 'admin',
+        createdAt: serverTimestamp()
+      });
+
+      // Update app_config version name if version provided
+      if (data.version.trim()) {
+        const configRef = doc(db, 'app_config', 'global');
+        const formattedVer = data.version.trim().toLowerCase().startsWith('mix') 
+          ? data.version.trim() 
+          : `Mix Messenger ${data.version.trim().startsWith('v') ? data.version.trim() : `v${data.version.trim()}`}`;
+        await setDoc(configRef, {
+          versionName: formattedVer,
+          updatedAt: serverTimestamp(),
+          updatedBy: auth.currentUser?.email || 'admin'
+        }, { merge: true });
+      }
+
+      // If requested, broadcast to group chats as system announcement
+      if (data.broadcastToChats && auth.currentUser) {
+        try {
+          const chatsQ = query(collection(db, 'chats'), limit(50));
+          const snap = await getDocs(chatsQ);
+          const groupChats = snap.docs.filter(d => d.data().isGroup);
+          
+          for (const gDoc of groupChats) {
+            const msgsCol = collection(db, 'chats', gDoc.id, 'messages');
+            await addDoc(msgsCol, {
+              senderId: auth.currentUser.uid,
+              senderName: 'Система',
+              type: 'system',
+              text: `📢 Обновление мессенджера (${data.version}): ${data.title}\n${data.content}`,
+              timestamp: serverTimestamp(),
+              readBy: [auth.currentUser.uid]
+            });
+            await updateDoc(doc(db, 'chats', gDoc.id), {
+              lastMessage: `📢 Обновление (${data.version}): ${data.title}`,
+              lastMessageSenderId: auth.currentUser.uid,
+              lastMessageSenderName: 'Система',
+              updatedAt: serverTimestamp()
+            });
+          }
+        } catch (bErr) {
+          console.warn("Broadcast announcement error:", bErr);
+        }
+      }
+
+      return docRef.id;
+    } catch (error) {
+      handleFirestoreError(error, 'create', 'changelogs');
+    }
+  },
+
+  deleteChangelog: async (id: string) => {
+    try {
+      const docRef = doc(db, 'changelogs', id);
+      await deleteDoc(docRef);
+    } catch (error) {
+      handleFirestoreError(error, 'delete', `changelogs/${id}`);
     }
   }
 };

@@ -94,15 +94,27 @@ service cloud.firestore {
            || existing().get('username', '') == ''
         )
       );
+      allow delete: if isAdmin() || isOwner(userId);
     }
+
+    match /app_config/{configId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /changelogs/{changelogId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     match /chats/{chatId} {
-      allow list: if isSignedIn() && resource.data.participantIds.hasAny([request.auth.uid]);
-      allow get: if isSignedIn() && (resource == null || resource.data.participantIds.hasAny([request.auth.uid]));
+      allow list: if isSignedIn() && (isAdmin() || resource.data.participantIds.hasAny([request.auth.uid]));
+      allow get: if isSignedIn() && (resource == null || isAdmin() || resource.data.participantIds.hasAny([request.auth.uid]));
       
       allow create: if isSignedIn() && isValidChat(incoming()) && isValidId(chatId);
       
       allow update: if isSignedIn()
-        && existing().participantIds.hasAny([request.auth.uid])
+        && (isAdmin() || existing().participantIds.hasAny([request.auth.uid]))
         && (
           // Action 1: Update metadata on new message
           (incoming().participantIds == existing().participantIds && incoming().updatedAt == request.time)
@@ -119,7 +131,7 @@ service cloud.firestore {
           )
         );
 
-      allow delete: if isSignedIn() && existing().participantIds.hasAny([request.auth.uid]);
+      allow delete: if isSignedIn() && (isAdmin() || existing().participantIds.hasAny([request.auth.uid]));
     }
 
     match /chats/{chatId}/messages/{messageId} {

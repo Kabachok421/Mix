@@ -60,3 +60,19 @@ export interface Message {
   deliveredTo?: string[];
   status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
 }
+
+export interface AppConfig {
+  versionName: string;
+  updatedAt?: Timestamp;
+  updatedBy?: string;
+}
+
+export interface ChangelogItem {
+  id: string;
+  version: string;
+  title: string;
+  content: string;
+  createdAt: Timestamp;
+  createdBy?: string;
+  authorName?: string;
+}

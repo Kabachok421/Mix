@@ -91,3 +91,28 @@ export function formatLastSeen(lastSeen: any): string {
     return `Был(а) ${day}.${month}.${year}`;
   }
 }
+
+export function isUserOnline(user: UserProfile | null | undefined): boolean {
+  if (!user) return false;
+  if (user.status !== 'online') return false;
+  if (!user.lastSeen) return false;
+
+  let date: Date;
+  const lastSeen = user.lastSeen;
+  if (typeof (lastSeen as any).toDate === 'function') {
+    date = (lastSeen as any).toDate();
+  } else if ((lastSeen as any).seconds) {
+    date = new Date((lastSeen as any).seconds * 1000);
+  } else if (typeof lastSeen === 'string' || typeof lastSeen === 'number') {
+    date = new Date(lastSeen);
+  } else if (lastSeen instanceof Date) {
+    date = lastSeen;
+  } else {
+    return false;
+  }
+
+  if (isNaN(date.getTime())) return false;
+  const diffInMinutes = (Date.now() - date.getTime()) / (1000 * 60);
+  // Considered online if heartbeat was received within the last 3 minutes
+  return diffInMinutes <= 3;
+}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { File, Download, Image as ImageIcon, X } from 'lucide-react';
+import { File, Download, Image as ImageIcon, X, FileText, Archive, Code, Music, Film } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface FileMessageProps {
@@ -20,6 +20,49 @@ export function FileMessage({ type, url, thumbnail, fileName, fileSize, isMe }: 
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const getFileDetails = (name?: string) => {
+    if (!name) return { IconComponent: File, colorClass: 'text-blue-500 bg-blue-50 dark:bg-blue-900/20' };
+    const ext = name.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'pdf':
+        return { IconComponent: FileText, colorClass: 'text-rose-500 bg-rose-50 dark:bg-rose-900/20' };
+      case 'doc':
+      case 'docx':
+      case 'txt':
+      case 'rtf':
+        return { IconComponent: FileText, colorClass: 'text-blue-500 bg-blue-50 dark:bg-blue-900/20' };
+      case 'zip':
+      case 'rar':
+      case '7z':
+      case 'tar':
+      case 'gz':
+        return { IconComponent: Archive, colorClass: 'text-amber-500 bg-amber-50 dark:bg-amber-900/20' };
+      case 'js':
+      case 'ts':
+      case 'tsx':
+      case 'jsx':
+      case 'json':
+      case 'html':
+      case 'css':
+      case 'py':
+        return { IconComponent: Code, colorClass: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' };
+      case 'mp3':
+      case 'wav':
+      case 'ogg':
+      case 'm4a':
+      case 'flac':
+        return { IconComponent: Music, colorClass: 'text-purple-500 bg-purple-50 dark:bg-purple-900/20' };
+      case 'mp4':
+      case 'webm':
+      case 'mov':
+      case 'avi':
+      case 'mkv':
+        return { IconComponent: Film, colorClass: 'text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' };
+      default:
+        return { IconComponent: File, colorClass: 'text-blue-500 bg-blue-50 dark:bg-blue-900/20' };
+    }
   };
 
   const [hasImageError, setHasImageError] = useState(false);
@@ -138,26 +181,28 @@ export function FileMessage({ type, url, thumbnail, fileName, fileSize, isMe }: 
     ? `${url}?download=true&downloadName=${encodeURIComponent(fileName || 'file')}` 
     : url;
 
+  const { IconComponent, colorClass } = getFileDetails(fileName);
+
   return (
     <a 
       href={downloadUrl || '#'} 
       download={fileName || 'file'}
       target="_blank" 
       rel="noopener noreferrer"
-      className={`flex items-center gap-3 p-2 rounded-xl transition-colors ${
+      className={`flex items-center gap-3 p-2.5 rounded-2xl transition-colors ${
         isMe ? 'hover:bg-white/10' : 'hover:bg-gray-100 dark:hover:bg-white/5'
       }`}
     >
-      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-        isMe ? 'bg-white/20' : 'bg-blue-50 dark:bg-blue-900/20 text-blue-500'
+      <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
+        isMe ? 'bg-white/20 text-white' : colorClass
       }`}>
-        <File className="w-5 h-5" />
+        <IconComponent className="w-5 h-5" />
       </div>
       <div className="flex-1 min-w-0">
-        <div className={`text-sm font-medium truncate ${isMe ? 'text-white' : 'text-gray-800 dark:text-gray-200'}`}>
+        <div className={`text-sm font-semibold truncate ${isMe ? 'text-white' : 'text-gray-900 dark:text-gray-100'}`}>
           {fileName || 'Файл'}
         </div>
-        <div className={`text-[10px] ${isMe ? 'text-white/70' : 'text-gray-400'}`}>
+        <div className={`text-[11px] ${isMe ? 'text-white/75' : 'text-gray-400'}`}>
           {formatSize(fileSize)}
         </div>
       </div>

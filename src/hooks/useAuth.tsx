@@ -111,17 +111,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (document.visibilityState === 'visible') {
           setDoc(userRef, { status: 'online', lastSeen: serverTimestamp() }, { merge: true }).catch(console.error);
         }
-      }, 2 * 60 * 1000); // Every 2 minutes
+      }, 45 * 1000); // Heartbeat every 45 seconds
     };
     startPing();
 
     const handleBeforeUnload = () => {
-      // In beforeunload, beacon or synchronous fetch is better, but this usually works enough for a simple setup.
       setDoc(userRef, { status: 'offline', lastSeen: serverTimestamp() }, { merge: true }).catch(console.error);
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handleBeforeUnload);
 
     // Ensure status is updated if we become active
     if (document.visibilityState === 'visible') {
@@ -133,6 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearInterval(pingInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handleBeforeUnload);
       handleBeforeUnload();
     };
   }, [user?.uid]);

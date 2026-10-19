@@ -3,9 +3,9 @@ import { useAuth } from '../hooks/useAuth';
 import { chatService } from '../services/chatService';
 import { fileTransferService } from '../services/fileTransferService';
 import { Chat, Message, UserProfile } from '../types';
-import { Send, Smile, Paperclip, MoreVertical, MessageSquare, Trash2, ChevronLeft, Mic, X, Image as ImageIcon, File as FileIcon, Loader2, Video, Cloud, Share2, Users, Info, UserPlus } from 'lucide-react';
+import { Send, Smile, Paperclip, MoreVertical, MessageSquare, Trash2, ChevronLeft, Mic, X, Image as ImageIcon, File as FileIcon, Loader2, Video, Cloud, Share2, Users, Info, UserPlus, UploadCloud } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn, getUserDisplayName, formatLastSeen, generateThumbnail } from '../lib/utils';
+import { cn, getUserDisplayName, formatLastSeen, generateThumbnail, isUserOnline } from '../lib/utils';
 import { UserName } from './UserName';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -47,6 +47,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
   const [uploadMethod, setUploadMethod] = useState('');
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const dragCounter = useRef(0);
   const [p2pFiles, setP2pFiles] = useState<Record<string, string>>({});
   const { isRecording, duration, startRecording, stopRecording, cancelRecording } = useVoiceRecorder();
 
@@ -190,19 +191,32 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
   const uploadSelectedFile = async (file: File, type: 'image' | 'file') => {
     if (!file || !user) return;
 
+    if (file.size > 100 * 1024 * 1024) {
+      setUploadError('Размер файла превышает 100 МБ');
+      setTimeout(() => setUploadError(null), 5000);
+      return;
+    }
+
     try {
       setIsUploading(true);
       setUploadProgress(0);
       setUploadError(null);
       setShowAttachmentMenu(false);
 
-      setUploadMethod(type === 'image' ? 'Фото' : 'Файл');
+      const isVideo = file.type.startsWith('video/') || !!file.name.match(/\.(mp4|webm|mov|ogg)$/i);
+      const isImage = file.type.startsWith('image/');
+      const effectiveType = (isImage || isVideo) ? 'image' : 'file';
+
+      if (!uploadMethod) {
+        setUploadMethod(isVideo ? 'Видео' : (isImage ? 'Фото' : 'Файл'));
+      }
+
       const finalUrl = await chatService.uploadFile('', file, (progress) => {
         setUploadProgress(Math.round(progress));
       });
 
       let thumbnail: string | undefined = undefined;
-      if (type === 'image' && file.type.startsWith('image/')) {
+      if (isImage) {
         try {
           thumbnail = await generateThumbnail(file);
         } catch (e) {
@@ -215,7 +229,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
         user.uid, 
         getUserDisplayName(profile as UserProfile) || user.displayName || 'Anonymous', 
         { 
-          type, 
+          type: effectiveType, 
           url: finalUrl,
           thumbnail,
           fileName: file.name, 
@@ -229,29 +243,81 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
+      setUploadMethod('');
+    }
+  };
+
+  const uploadFiles = async (files: File[]) => {
+    if (!files || files.length === 0 || !user) return;
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const isMedia = file.type.startsWith('image/') || file.type.startsWith('video/') || !!file.name.match(/\.(mp4|webm|mov|ogg)$/i);
+      const type = isMedia ? 'image' : 'file';
+      if (files.length > 1) {
+        setUploadMethod(`${i + 1}/${files.length} • ${file.name}`);
+      }
+      await uploadSelectedFile(file, type);
     }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'file') => {
-    const file = e.target.files?.[0];
+    const files = e.target.files;
     if (e.target) e.target.value = '';
-    if (file) {
-      await uploadSelectedFile(file, type);
+    if (files && files.length > 0) {
+      await uploadFiles(Array.from(files));
     }
   };
 
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     const items = e.clipboardData?.items;
     if (!items) return;
+    const pastedFiles: File[] = [];
     for (let i = 0; i < items.length; i++) {
-      if (items[i].type.startsWith('image/')) {
+      if (items[i].kind === 'file') {
         const file = items[i].getAsFile();
-        if (file) {
-          e.preventDefault();
-          uploadSelectedFile(file, 'image');
-          break;
-        }
+        if (file) pastedFiles.push(file);
       }
+    }
+    if (pastedFiles.length > 0) {
+      e.preventDefault();
+      uploadFiles(pastedFiles);
+    }
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current++;
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDraggingOver(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current--;
+    if (dragCounter.current <= 0) {
+      dragCounter.current = 0;
+      setIsDraggingOver(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current = 0;
+    setIsDraggingOver(false);
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      await uploadFiles(Array.from(files));
     }
   };
 
@@ -323,10 +389,85 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
   };
 
   const isGroup = !!currentChat?.isGroup;
-  const onlineCount = (Object.values(groupMembersMap) as UserProfile[]).filter(m => m?.status === 'online').length;
+  const onlineCount = (Object.values(groupMembersMap) as UserProfile[]).filter(m => isUserOnline(m)).length;
 
   return (
-    <div className="flex-1 flex flex-col bg-white dark:bg-[#0d0d0d] overflow-hidden transition-colors duration-500">
+    <div 
+      className="flex-1 flex flex-col bg-white dark:bg-[#0d0d0d] overflow-hidden transition-colors duration-500 relative"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Drag & Drop Visual Overlay with Rich Animations */}
+      <AnimatePresence>
+        {isDraggingOver && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="absolute inset-0 z-50 pointer-events-none p-4 sm:p-8 flex items-center justify-center bg-blue-600/10 dark:bg-blue-500/20 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ scale: 0.88, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 10 }}
+              transition={{ type: "spring", damping: 22, stiffness: 320 }}
+              className="w-full max-w-md bg-white/95 dark:bg-[#161616]/95 border-2 border-dashed border-blue-500 dark:border-blue-400 rounded-3xl p-7 shadow-2xl flex flex-col items-center text-center relative overflow-hidden backdrop-saturate-150"
+            >
+              {/* Radial gradient ambient lights */}
+              <div className="absolute -top-12 -right-12 w-40 h-40 bg-blue-500/20 rounded-full blur-2xl" />
+              <div className="absolute -bottom-12 -left-12 w-40 h-40 bg-indigo-500/20 rounded-full blur-2xl" />
+
+              {/* Animated Floating Upload Icon with Pulsing Rings */}
+              <div className="relative mb-5 flex items-center justify-center">
+                <motion.div
+                  animate={{ scale: [1, 1.45, 1], opacity: [0.35, 0, 0.35] }}
+                  transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                  className="absolute w-24 h-24 rounded-full bg-blue-500/25"
+                />
+                <motion.div
+                  animate={{ scale: [1, 1.25, 1], opacity: [0.5, 0.1, 0.5] }}
+                  transition={{ repeat: Infinity, duration: 2, ease: "easeInOut", delay: 0.3 }}
+                  className="absolute w-20 h-20 rounded-full bg-blue-500/30"
+                />
+                <motion.div
+                  animate={{ y: [0, -7, 0] }}
+                  transition={{ repeat: Infinity, duration: 1.8, ease: "easeInOut" }}
+                  className="relative w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 via-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/40"
+                >
+                  <UploadCloud className="w-8 h-8 stroke-[2.2]" />
+                </motion.div>
+              </div>
+
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">
+                Отпустите файлы для отправки
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 max-w-xs leading-relaxed">
+                Файлы будут автоматически загружены и добавлены в диалог
+              </p>
+
+              {/* Supported format badges */}
+              <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
+                <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-300 border border-blue-200/60 dark:border-blue-900/40 flex items-center gap-1.5">
+                  <ImageIcon className="w-3 h-3" />
+                  Фото и видео
+                </span>
+                <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-900/40 flex items-center gap-1.5">
+                  <FileIcon className="w-3 h-3" />
+                  Документы
+                </span>
+                <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-300 border border-purple-200/60 dark:border-purple-900/40 flex items-center gap-1.5">
+                  <Cloud className="w-3 h-3" />
+                  До 100 МБ
+                </span>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <div 
         className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-[#222] bg-white/80 dark:bg-[#0d0d0d]/80 backdrop-blur-md z-10 cursor-pointer group flex-shrink-0"
@@ -410,7 +551,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
             >
               <Users className="w-5 h-5" />
             </button>
-          ) : otherUser?.status === 'online' ? (
+          ) : (otherUser && isUserOnline(otherUser)) ? (
             <button
               onClick={handleStartCall}
               className="p-2 mr-1 hover:bg-gray-100 dark:hover:bg-[#222] rounded-full transition-colors text-gray-400 hover:text-green-500"
@@ -489,33 +630,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
       </AnimatePresence>
 
       {/* Messages */}
-      <div 
-        className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#fafafa] dark:bg-[#080808] custom-scrollbar relative"
-        onDragOver={(e) => { e.preventDefault(); setIsDraggingOver(true); }}
-        onDragLeave={(e) => { 
-          if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-            setIsDraggingOver(false); 
-          }
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          setIsDraggingOver(false);
-          const file = e.dataTransfer.files?.[0];
-          if (file) {
-            uploadSelectedFile(file, file.type.startsWith('image/') ? 'image' : 'file');
-          }
-        }}
-      >
-        {isDraggingOver && (
-          <div className="absolute inset-0 z-30 bg-blue-500/10 dark:bg-blue-500/20 backdrop-blur-xs border-2 border-dashed border-blue-500 rounded-xl flex flex-col items-center justify-center gap-3 m-3 pointer-events-none">
-            <div className="w-14 h-14 rounded-full bg-blue-500 text-white flex items-center justify-center shadow-lg animate-bounce">
-              <Paperclip className="w-7 h-7" />
-            </div>
-            <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">
-              Отпустите файл здесь для отправки
-            </p>
-          </div>
-        )}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#fafafa] dark:bg-[#080808] custom-scrollbar">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-gray-300 dark:text-gray-700 gap-4">
             <div className="w-20 h-20 rounded-full bg-gray-50 dark:bg-[#111] flex items-center justify-center border border-gray-100 dark:border-[#222] shadow-inner">
@@ -809,12 +924,14 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
         ref={imageInputRef} 
         onChange={(e) => handleFileUpload(e, 'image')} 
         accept="image/*,video/*" 
+        multiple
         className="hidden" 
       />
       <input 
         type="file" 
         ref={fileInputRef} 
         onChange={(e) => handleFileUpload(e, 'file')} 
+        multiple
         className="hidden" 
       />
     </div>
