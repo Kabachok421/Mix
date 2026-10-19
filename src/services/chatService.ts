@@ -202,12 +202,16 @@ export const chatService = {
         default: lastMessageText = messageData.text || '';
       }
 
-      await updateDoc(chatRef, {
-        lastMessage: lastMessageText,
-        lastMessageSenderId: senderId,
-        lastMessageSenderName: senderName,
-        updatedAt: timestamp
-      });
+      try {
+        await updateDoc(chatRef, {
+          lastMessage: lastMessageText,
+          lastMessageSenderId: senderId,
+          lastMessageSenderName: senderName,
+          updatedAt: timestamp
+        });
+      } catch (updateErr) {
+        console.warn('Could not update chat lastMessage summary:', updateErr);
+      }
     } catch (error) {
       handleFirestoreError(error, 'create', `chats/${chatId}/messages`);
     }

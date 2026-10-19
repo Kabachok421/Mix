@@ -260,12 +260,12 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'file') => {
-    const files = e.target.files;
-    if (e.target) e.target.value = '';
-    if (files && files.length > 0) {
-      await uploadFiles(Array.from(files));
-    }
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, _type: 'image' | 'file') => {
+    const target = e.target;
+    if (!target.files || target.files.length === 0) return;
+    const fileList = Array.from(target.files) as File[];
+    target.value = ''; // Safely reset input value AFTER copying the file list to an array!
+    await uploadFiles(fileList);
   };
 
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
@@ -288,7 +288,8 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
     e.preventDefault();
     e.stopPropagation();
     dragCounter.current++;
-    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+    const hasFiles = e.dataTransfer.types ? Array.from(e.dataTransfer.types).includes('Files') : false;
+    if (hasFiles || (e.dataTransfer.items && e.dataTransfer.items.length > 0)) {
       setIsDraggingOver(true);
     }
   };
@@ -315,9 +316,9 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
     dragCounter.current = 0;
     setIsDraggingOver(false);
 
-    const files = e.dataTransfer.files;
-    if (files && files.length > 0) {
-      await uploadFiles(Array.from(files));
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const droppedFiles = Array.from(e.dataTransfer.files) as File[];
+      await uploadFiles(droppedFiles);
     }
   };
 
@@ -407,7 +408,10 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="absolute inset-0 z-50 pointer-events-none p-4 sm:p-8 flex items-center justify-center bg-blue-600/10 dark:bg-blue-500/20 backdrop-blur-md"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className="absolute inset-0 z-50 p-4 sm:p-8 flex items-center justify-center bg-blue-600/15 dark:bg-blue-500/20 backdrop-blur-md cursor-pointer"
           >
             <motion.div
               initial={{ scale: 0.88, opacity: 0, y: 15 }}

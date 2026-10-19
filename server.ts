@@ -13,38 +13,42 @@ async function startServer() {
     fs.mkdirSync(UPLOAD_DIR, { recursive: true });
   }
 
-  // API raw upload route - streams any incoming request stream directly to disk!
+  // API raw upload route - buffers incoming raw stream and writes to disk reliably
   app.post('/api/upload-raw', async (req, res) => {
     try {
-      const filename = (req.query.filename as string) || 'file.bin';
+      const rawFilename = (req.query.filename as string) || 'file.bin';
       const mimeType = (req.query.mimeType as string) || (req.headers['content-type'] as string) || 'application/octet-stream';
       
-      const safeFilename = path.basename(decodeURIComponent(filename));
+      let safeFilename = 'file.bin';
+      try {
+        safeFilename = path.basename(decodeURIComponent(rawFilename));
+      } catch {
+        safeFilename = path.basename(rawFilename);
+      }
+      
       const ext = path.extname(safeFilename) || '';
       const baseClean = path.basename(safeFilename, ext).replace(/[^a-zA-Z0-9_\-\u0400-\u04FF]/g, '_').substring(0, 40) || 'file';
       const uniqueName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}_${baseClean}${ext}`;
       const filePath = path.join(UPLOAD_DIR, uniqueName);
 
-      const writeStream = fs.createWriteStream(filePath);
+      const chunks: Buffer[] = [];
       let fileSize = 0;
 
-      req.on('data', (chunk) => {
-        fileSize += chunk.length;
-      });
-
       await new Promise<void>((resolve, reject) => {
-        req.pipe(writeStream);
-        writeStream.on('finish', () => resolve());
-        writeStream.on('error', (err) => reject(err));
+        req.on('data', (chunk: Buffer) => {
+          chunks.push(chunk);
+          fileSize += chunk.length;
+        });
+        req.on('end', () => resolve());
         req.on('error', (err) => reject(err));
       });
 
       if (fileSize === 0) {
-        if (fs.existsSync(filePath)) {
-          try { fs.unlinkSync(filePath); } catch {}
-        }
         return res.status(400).json({ error: 'Файл пуст или не передан' });
       }
+
+      const fileBuffer = Buffer.concat(chunks);
+      await fs.promises.writeFile(filePath, fileBuffer);
 
       const fileUrl = `/api/files/${encodeURIComponent(uniqueName)}`;
       return res.json({ 
