@@ -43,7 +43,7 @@
           ]
         }
       ],
-      "icon": "build/icon.ico"
+      "icon": "electron/icon.png"
     },
     "nsis": {
       "oneClick": false,
@@ -55,8 +55,6 @@
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false,
       "language": "1049",
-      "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico",
       "artifactName": "Mix-Setup-${version}.exe"
     },
     "publish": [
