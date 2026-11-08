@@ -1,12 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { notificationService, NotificationSettings as SettingsType } from '../services/notificationService';
-import { Bell, BellOff, Volume2, VolumeX, MessageSquare, Check, Sparkles } from 'lucide-react';
+import { Bell, BellOff, Volume2, VolumeX, MessageSquare, Check, Sparkles, Music, Upload, Play, Trash2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export function NotificationSettings() {
   const [settings, setSettings] = useState<SettingsType>(notificationService.getSettings());
   const [permission, setPermission] = useState<NotificationPermission>(notificationService.getPermissionStatus());
   const [testSent, setTestSent] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [soundBusy, setSoundBusy] = useState(false);
+  const [soundError, setSoundError] = useState<string | null>(null);
 
   useEffect(() => {
     setPermission(notificationService.getPermissionStatus());
@@ -20,6 +23,29 @@ export function NotificationSettings() {
     if (next) {
       notificationService.playNotificationSound('incoming');
     }
+  };
+
+  const handlePickSound = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // чтобы тот же файл можно было выбрать повторно
+    if (!file) return;
+    setSoundBusy(true);
+    setSoundError(null);
+    try {
+      await notificationService.setCustomSound(file);
+      setSettings(notificationService.getSettings());
+      notificationService.previewSound();
+    } catch (err: any) {
+      setSoundError(err?.message || 'Не удалось загрузить звук');
+    } finally {
+      setSoundBusy(false);
+    }
+  };
+
+  const handleResetSound = async () => {
+    await notificationService.clearCustomSound();
+    setSettings(notificationService.getSettings());
+    setSoundError(null);
   };
 
   const handleToggleDesktop = async () => {
@@ -106,6 +132,48 @@ export function NotificationSettings() {
               )}
             />
           </div>
+        </div>
+
+        {/* Свой звук уведомления */}
+        <div className="p-3 rounded-2xl border border-gray-200 dark:border-[#333] space-y-2.5">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-amber-500/10 text-amber-600 dark:text-amber-400">
+              <Music className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs md:text-sm font-medium text-gray-900 dark:text-gray-100 truncate">Свой звук уведомления</p>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                {settings.customSoundName ? settings.customSoundName : 'Сейчас: стандартный звук'}
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => fileInputRef.current?.click()} disabled={soundBusy} className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-gray-200 dark:border-[#333] text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#252525] disabled:opacity-50 transition-all">
+              <Upload className="w-3.5 h-3.5" />
+              Загрузить
+            </button>
+            <button type="button" onClick={() => notificationService.previewSound()} className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-gray-200 dark:border-[#333] text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#252525] disabled:opacity-50 transition-all">
+              <Play className="w-3.5 h-3.5" />
+              Прослушать
+            </button>
+            {settings.customSoundName && (
+              <button type="button" onClick={handleResetSound} className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-gray-200 dark:border-[#333] text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#252525] disabled:opacity-50 transition-all">
+                <Trash2 className="w-3.5 h-3.5" />
+                Сбросить
+              </button>
+            )}
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.opus"
+            className="hidden"
+            onChange={handlePickSound}
+          />
+          {soundError && <p className="text-[11px] text-red-600 dark:text-red-400">{soundError}</p>}
+          <p className="text-[11px] text-gray-400 dark:text-gray-500">
+            MP3, WAV, OGG или M4A, до 10 секунд и 2 МБ. Звук хранится на этом устройстве и слышен только вам.
+          </p>
         </div>
 
         {/* Системные уведомления браузера */}
