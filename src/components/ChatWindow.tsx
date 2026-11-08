@@ -474,7 +474,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
 
       {/* Header */}
       <div 
-        className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-[#222] bg-white/80 dark:bg-[#0d0d0d]/80 backdrop-blur-md z-10 cursor-pointer group flex-shrink-0"
+        className="absolute top-3 left-3 right-3 z-20 isolate px-4 py-3 rounded-[28px] flex items-center justify-between cursor-pointer group"
         onClick={() => { 
           if (isGroup) {
             setShowGroupInfo(true);
@@ -483,6 +483,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
           }
         }}
       >
+        <div aria-hidden="true" className="glass-bar absolute inset-0 -z-10 rounded-[28px] pointer-events-none" />
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <button
             onClick={(e) => {
@@ -634,7 +635,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
       </AnimatePresence>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#fafafa] dark:bg-[#080808] custom-scrollbar">
+      <div className="flex-1 overflow-y-auto px-4 pt-24 pb-28 space-y-4 bg-[#fafafa] dark:bg-[#080808] custom-scrollbar">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-gray-300 dark:text-gray-700 gap-4">
             <div className="w-20 h-20 rounded-full bg-gray-50 dark:bg-[#111] flex items-center justify-center border border-gray-100 dark:border-[#222] shadow-inner">
@@ -751,7 +752,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
       </div>
 
       {/* Input */}
-      <div className="p-4 bg-white dark:bg-[#0d0d0d] border-t border-gray-100 dark:border-[#222] transition-colors relative">
+      <div className="absolute bottom-0 left-0 right-0 z-20 p-3">
         {uploadError && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -826,7 +827,8 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSend} className="flex items-center gap-3 bg-gray-50 dark:bg-[#1a1a1a] p-2 rounded-[24px] border border-gray-100 dark:border-[#222] focus-within:ring-2 focus-within:ring-[#5A5A40]/10 dark:focus-within:ring-[#A0A080]/10 transition-all">
+          <form onSubmit={handleSend} className="relative isolate flex items-center gap-3 p-2 rounded-[28px] transition-all">
+            <div aria-hidden="true" className="glass-bar absolute inset-0 -z-10 rounded-[28px] pointer-events-none" />
             <button type="button" className="p-2 hover:bg-gray-200 dark:hover:bg-[#222] rounded-full text-gray-400 transition-colors">
               <Smile className="w-5 h-5" />
             </button>
