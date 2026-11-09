@@ -43,6 +43,15 @@ export interface Call {
   updatedAt: Timestamp;
 }
 
+// Ссылка на сообщение, на которое отвечают (хранится копией, чтобы цитата работала и после удаления оригинала)
+export interface ReplyRef {
+  id: string;
+  senderId: string;
+  senderName: string;
+  text: string; // для фото, файла и голосового: «📷 Фото», «🎤 Голосовое сообщение», «📁 имя»
+  type?: 'text' | 'image' | 'file' | 'voice' | 'system';
+}
+
 export interface Message {
   id: string;
   text?: string;
@@ -55,6 +64,7 @@ export interface Message {
   fileName?: string;
   fileSize?: number;
   duration?: number; // for voice
+  replyTo?: ReplyRef;
   // Message delivery and read status indicators
   readBy?: string[];
   deliveredTo?: string[];

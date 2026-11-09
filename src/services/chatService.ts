@@ -191,6 +191,15 @@ export const chatService = {
       if (data.fileName) messageData.fileName = data.fileName;
       if (data.fileSize) messageData.fileSize = data.fileSize;
       if (data.duration) messageData.duration = data.duration;
+      if (data.replyTo) {
+        messageData.replyTo = {
+          id: String(data.replyTo.id).slice(0, 128),
+          senderId: data.replyTo.senderId,
+          senderName: String(data.replyTo.senderName || '').slice(0, 60),
+          text: String(data.replyTo.text || '').slice(0, 120),
+          type: data.replyTo.type || 'text',
+        };
+      }
 
       await addDoc(messagesRef, messageData);
 

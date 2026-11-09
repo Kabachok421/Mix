@@ -18,6 +18,7 @@ import { CallManager } from './components/CallManager';
 import { UserName } from './components/UserName';
 import { InAppNotificationToast } from './components/InAppNotificationToast';
 import { NotificationSettings } from './components/NotificationSettings';
+import { AppearanceSettings } from './components/AppearanceSettings';
 import { notificationService } from './services/notificationService';
 import { chatService } from './services/chatService';
 import { UserProfile } from './types';
@@ -168,7 +169,7 @@ export default function App() {
         
         {/* Sidebar */}
         <aside className={cn(
-          "w-full sm:w-[380px] flex-col border-r border-gray-100 dark:border-[#222] h-full relative z-20",
+          "w-full sm:w-[300px] flex-col border-r border-gray-100 dark:border-[#222] h-full relative z-20",
           activeChatId ? "hidden sm:flex" : "flex"
         )}>
           <div className="p-6 flex items-center justify-between">
@@ -267,13 +268,13 @@ export default function App() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowSettings(false)}
-              className="fixed inset-0 bg-black/40 dark:bg-black/80 backdrop-blur-sm z-[100]"
+              className="fixed inset-0 bg-black/25 dark:bg-black/45 z-[100]"
             />
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] max-w-sm md:max-w-4xl max-h-[90vh] flex flex-col bg-white dark:bg-[#1a1a1a] rounded-[32px] shadow-2xl z-[101] overflow-hidden border border-[#e5e5e0] dark:border-[#333]"
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] max-w-sm md:max-w-4xl max-h-[90vh] flex flex-col glass-panel rounded-[32px] z-[101] overflow-hidden"
             >
               <div className="p-6 border-b border-gray-100 dark:border-[#222] flex items-center justify-between shrink-0">
                 <h3 className="text-xl font-serif dark:text-white">Настройки</h3>
@@ -326,6 +327,8 @@ export default function App() {
                   </div>
 
                   <NotificationSettings />
+
+                  <AppearanceSettings />
 
                   {/* What's New Button */}
                   <button

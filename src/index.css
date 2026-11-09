@@ -113,3 +113,93 @@
     inset 0 1px 1px rgba(120, 240, 255, 0.35),
     inset 0 -1px 1px rgba(0, 200, 255, 0.1);
 }
+
+/* ===== Внешний вид: цвета сообщений и фон чата (задаются в настройках) ===== */
+html[data-my-bubble] .msg-mine {
+  background-color: var(--my-bubble) !important;
+}
+html[data-my-text] .msg-mine,
+html[data-my-text] .msg-mine .msg-meta {
+  color: var(--my-text) !important;
+}
+html[data-their-bubble] .msg-theirs {
+  background-color: var(--their-bubble) !important;
+}
+html[data-their-text] .msg-theirs,
+html[data-their-text] .msg-theirs .msg-meta {
+  color: var(--their-text) !important;
+}
+html[data-chat-bg] .chat-surface {
+  background-color: var(--chat-bg-color) !important;
+  background-image: var(--chat-bg-image) !important;
+  background-size: cover;
+  background-position: center;
+  background-attachment: local;
+}
+
+/* Подсветка сообщения, к которому перешли по ответу */
+@keyframes msg-flash {
+  0%, 55% { filter: brightness(1.45) saturate(1.3); }
+  100% { filter: none; }
+}
+.msg-flash {
+  animation: msg-flash 1.3s ease-out;
+}
+
+/* ===== Жидкое стекло для окна настроек ===== */
+.glass-panel {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.52));
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow:
+    0 24px 60px rgba(20, 20, 40, 0.25),
+    inset 0 1px 1px rgba(255, 255, 255, 0.95),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.3);
+}
+.glass-panel::before {
+  /* блик сверху, под содержимым окна */
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0) 45%);
+}
+.dark .glass-panel {
+  background: linear-gradient(135deg, rgba(44, 44, 56, 0.72), rgba(20, 20, 28, 0.58));
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.6),
+    inset 0 1px 1px rgba(255, 255, 255, 0.22),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.05);
+}
+.dark .glass-panel::before {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 45%);
+}
+.ocean .glass-panel {
+  background: linear-gradient(135deg, rgba(0, 200, 255, 0.16), rgba(0, 90, 160, 0.14));
+  border-color: rgba(0, 220, 255, 0.25);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.6),
+    0 0 30px rgba(0, 170, 255, 0.12),
+    inset 0 1px 1px rgba(120, 240, 255, 0.35);
+}
+
+/* Свои параметры стекла из настроек: цвет, прозрачность, размытие, насыщенность, кромка */
+html[data-glass-custom] .glass-bar,
+html[data-glass-custom] .glass-panel {
+  background: linear-gradient(
+    135deg,
+    rgb(var(--glass-rgb) / var(--glass-a1)),
+    rgb(var(--glass-rgb) / var(--glass-a2))
+  );
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  border-color: rgb(255 255 255 / var(--glass-edge));
+  box-shadow:
+    0 14px 40px rgb(0 0 0 / 0.3),
+    inset 0 1px 1px rgb(255 255 255 / var(--glass-edge)),
+    inset 0 -1px 1px rgb(255 255 255 / calc(var(--glass-edge) * 0.3));
+}

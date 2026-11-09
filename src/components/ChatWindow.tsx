@@ -2,8 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { chatService } from '../services/chatService';
 import { fileTransferService } from '../services/fileTransferService';
-import { Chat, Message, UserProfile } from '../types';
-import { Send, Smile, Paperclip, MoreVertical, MessageSquare, Trash2, ChevronLeft, Mic, X, Image as ImageIcon, File as FileIcon, Loader2, Video, Cloud, Share2, Users, Info, UserPlus, UploadCloud } from 'lucide-react';
+import { Chat, Message, UserProfile, ReplyRef } from '../types';
+import { Send, Smile, Paperclip, MoreVertical, MessageSquare, Trash2, ChevronLeft, Mic, X, Image as ImageIcon, File as FileIcon, Loader2, Video, Cloud, Share2, Users, Info, UserPlus, UploadCloud, Reply } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, getUserDisplayName, formatLastSeen, generateThumbnail, isUserOnline } from '../lib/utils';
 import { UserName } from './UserName';
@@ -40,6 +40,13 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [replyingTo, setReplyingTo] = useState<ReplyRef | null>(null);
+
+  // В другом чате ответ не переносим
+  useEffect(() => {
+    setReplyingTo(null);
+  }, [chatId]);
   
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -174,18 +181,51 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
     }
   };
 
+  // --- Ответ на сообщение ---
+  const replyNameOf = (m: Message): string => {
+    if (m.senderId === user?.uid) {
+      return getUserDisplayName(profile as UserProfile) || user?.displayName || m.senderName || 'Вы';
+    }
+    const p = groupMembersMap[m.senderId] || (otherUser && otherUser.uid === m.senderId ? otherUser : null);
+    return (p ? getUserDisplayName(p as UserProfile) : '') || m.senderName || 'Пользователь';
+  };
+
+  const replyPreview = (m: Message): string => {
+    if (m.type === 'image') return '📷 Фото';
+    if (m.type === 'voice') return '🎤 Голосовое сообщение';
+    if (m.type === 'file') return `📁 ${m.fileName || 'Файл'}`;
+    return (m.text || '').slice(0, 120);
+  };
+
+  const startReply = (m: Message) => {
+    setReplyingTo({ id: m.id, senderId: m.senderId, senderName: replyNameOf(m), text: replyPreview(m), type: m.type });
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  const jumpToMessage = (id: string) => {
+    const el = document.getElementById(`msg-${id}`);
+    if (!el) return; // оригинал удалён или ещё не загружен
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.remove('msg-flash');
+    void el.offsetWidth; // перезапуск анимации
+    el.classList.add('msg-flash');
+    setTimeout(() => el.classList.remove('msg-flash'), 1400);
+  };
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || !user) return;
 
     const text = input.trim();
+    const reply = replyingTo;
     setInput('');
+    setReplyingTo(null);
     
     // Clear typing indicator immediately
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     chatService.setTypingStatus(chatId, user.uid, false);
 
-    await chatService.sendMessage(chatId, user.uid, getUserDisplayName(profile as UserProfile) || user.displayName || 'Anonymous', { text, type: 'text' });
+    await chatService.sendMessage(chatId, user.uid, getUserDisplayName(profile as UserProfile) || user.displayName || 'Anonymous', { text, type: 'text', replyTo: reply || undefined });
   };
 
   const uploadSelectedFile = async (file: File, type: 'image' | 'file') => {
@@ -233,9 +273,11 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
           url: finalUrl,
           thumbnail,
           fileName: file.name, 
-          fileSize: file.size 
+          fileSize: file.size,
+          replyTo: replyingTo || undefined
         }
       );
+      setReplyingTo(null);
     } catch (error: any) {
       console.error('File upload failed:', error);
       setUploadError(error?.message || 'Ошибка при отправке файла');
@@ -346,9 +388,11 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
           type: 'voice', 
           url: finalUrl, 
           fileName,
-          duration: recording.duration 
+          duration: recording.duration,
+          replyTo: replyingTo || undefined
         }
       );
+      setReplyingTo(null);
     } catch (error: any) {
       console.error('Voice upload failed:', error);
       setUploadError(error?.message || 'Ошибка при отправке голосового сообщения');
@@ -635,7 +679,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
       </AnimatePresence>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 pt-24 pb-28 space-y-4 bg-[#fafafa] dark:bg-[#080808] custom-scrollbar">
+      <div className={cn("chat-surface flex-1 overflow-y-auto px-4 pt-24 space-y-4 bg-[#fafafa] dark:bg-[#080808] custom-scrollbar", replyingTo ? "pb-44" : "pb-28")}>
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-gray-300 dark:text-gray-700 gap-4">
             <div className="w-20 h-20 rounded-full bg-gray-50 dark:bg-[#111] flex items-center justify-center border border-gray-100 dark:border-[#222] shadow-inner">
@@ -666,8 +710,9 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                 initial={{ opacity: 0, scale: 0.9, y: 10 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 key={msg.id}
+                id={`msg-${msg.id}`}
                 className={cn(
-                  "flex flex-col max-w-[80%] gap-1",
+                  "group/msg flex flex-col max-w-[80%] gap-1",
                   isMe ? "self-end items-end" : "self-start items-start"
                 )}
               >
@@ -690,11 +735,36 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                   className={cn(
                     "px-4 py-2.5 rounded-2xl shadow-sm text-sm relative transition-all duration-300",
                     isMe 
-                      ? "bg-[#1a1a1a] dark:bg-[#e5e5e0] text-white dark:text-black rounded-tr-none shadow-md" 
-                      : "bg-white dark:bg-[#1e1e1e] border border-gray-100 dark:border-[#333] text-gray-800 dark:text-gray-200 rounded-tl-none shadow-sm",
+                      ? "msg-mine bg-[#1a1a1a] dark:bg-[#e5e5e0] text-white dark:text-black rounded-tr-none shadow-md" 
+                      : "msg-theirs bg-white dark:bg-[#1e1e1e] border border-gray-100 dark:border-[#333] text-gray-800 dark:text-gray-200 rounded-tl-none shadow-sm",
                     (msg.type === 'image' || msg.type === 'voice' || msg.type === 'file') && "p-1.5"
                   )}
                 >
+                  {/* Кнопка «Ответить»: появляется при наведении на сообщение */}
+                  <div className={cn("absolute inset-y-0 w-10 flex items-center justify-center", isMe ? "-left-10" : "-right-10")}>
+                    <button
+                      type="button"
+                      onClick={() => startReply(msg)}
+                      title="Ответить"
+                      aria-label="Ответить"
+                      className="p-1.5 rounded-full bg-black/10 dark:bg-white/10 text-gray-500 dark:text-gray-300 hover:text-blue-500 opacity-0 group-hover/msg:opacity-100 focus:opacity-100 transition-opacity"
+                    >
+                      <Reply className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {msg.replyTo && (
+                    <button
+                      type="button"
+                      onClick={() => jumpToMessage(msg.replyTo!.id)}
+                      className="block w-full text-left mb-1.5 pl-2.5 pr-2 py-1 rounded-lg overflow-hidden"
+                      style={{ background: 'color-mix(in srgb, currentColor 14%, transparent)', borderLeft: '3px solid currentColor' }}
+                    >
+                      <span className="block text-[11px] font-semibold opacity-90 truncate">
+                        {msg.replyTo.senderId === user?.uid ? 'Вы' : msg.replyTo.senderName}
+                      </span>
+                      <span className="block text-xs opacity-75 truncate">{msg.replyTo.text}</span>
+                    </button>
+                  )}
                   {msg.type === 'voice' ? (
                     <VoiceMessage url={msg.url === 'p2p-sent' ? p2pFiles[msg.fileName || ''] || 'p2p-sent' : msg.url!} duration={msg.duration} isMe={isMe} />
                   ) : msg.type === 'image' || msg.type === 'file' ? (
@@ -710,7 +780,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                     msg.text
                   )}
                   <div className={cn(
-                    "flex flex-row items-center justify-end text-[9px] mt-1 font-sans text-right gap-1.5",
+                    "msg-meta flex flex-row items-center justify-end text-[9px] mt-1 font-sans text-right gap-1.5",
                     isMe ? "text-white/80 dark:text-black/80" : "text-gray-400 dark:text-gray-500"
                   )}>
                     {isMe && (
@@ -790,6 +860,25 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
           </div>
         )}
 
+        {replyingTo && !isRecording && (
+          <div className="relative isolate flex items-center gap-3 mb-2 pl-4 pr-2 py-2 rounded-[22px]">
+            <div aria-hidden="true" className="glass-bar absolute inset-0 -z-10 rounded-[22px] pointer-events-none" />
+            <Reply className="w-4 h-4 text-blue-500 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-blue-500 truncate">Ответ: {replyingTo.senderId === user?.uid ? 'себе' : replyingTo.senderName}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{replyingTo.text}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setReplyingTo(null)}
+              aria-label="Отменить ответ"
+              className="p-1.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 text-gray-400 shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {isRecording ? (
           <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-900/10 p-2 rounded-[24px] border border-blue-100 dark:border-blue-900/30 transition-all">
             <div className="flex-1 flex items-center gap-3 px-3">
@@ -833,11 +922,16 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
               <Smile className="w-5 h-5" />
             </button>
             <input
+              ref={inputRef}
               type="text"
               value={input}
               onChange={handleInputChange}
               onPaste={handlePaste}
               onKeyDown={(e) => {
+                if (e.key === 'Escape' && replyingTo) {
+                  setReplyingTo(null);
+                  return;
+                }
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   handleSend(e as any);
