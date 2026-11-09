@@ -20,6 +20,7 @@ concurrency:
 jobs:
   build:
     runs-on: windows-latest
+    timeout-minutes: 40
     env:
       VERSION: 1.0.${{ github.run_number }}
     steps:
@@ -27,24 +28,55 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+
+      # Кэш скачанного Electron: ошибки 504 при загрузке с GitHub больше не ломают сборку
+      - name: Cache Electron downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\electron\Cache
+            ~\AppData\Local\electron-builder\Cache
+          key: electron-${{ runner.os }}-${{ hashFiles('desktop/package.json') }}
+          restore-keys: |
+            electron-${{ runner.os }}-
 
       - name: Install web client deps
         run: npm install
 
+      # Бинарник Electron не качаем при npm install: его всё равно скачает electron-builder при сборке
       - name: Install desktop deps
-        run: npm install
         working-directory: desktop
+        shell: pwsh
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+        run: |
+          for ($i = 1; $i -le 3; $i++) {
+            npm install
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            Write-Host "npm install не удался (попытка $i из 3), повтор через $($i * 15) с..."
+            Start-Sleep -Seconds ($i * 15)
+          }
+          exit 1
 
       - name: Set version
-        run: npm version $env:VERSION --no-git-tag-version
         working-directory: desktop
+        shell: pwsh
+        run: npm version $env:VERSION --no-git-tag-version
 
       - name: Build installer
-        run: npm run dist
         working-directory: desktop
+        shell: pwsh
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: false
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: |
+          for ($i = 1; $i -le 3; $i++) {
+            npm run dist
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            Write-Host "Сборка не удалась (попытка $i из 3), повтор через $($i * 20) с..."
+            Start-Sleep -Seconds ($i * 20)
+          }
+          exit 1
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
