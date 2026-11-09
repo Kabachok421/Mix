@@ -3,7 +3,8 @@ import { useAuth } from '../hooks/useAuth';
 import { chatService } from '../services/chatService';
 import { fileTransferService } from '../services/fileTransferService';
 import { Chat, Message, UserProfile, ReplyRef } from '../types';
-import { Send, Smile, Paperclip, MoreVertical, MessageSquare, Trash2, ChevronLeft, Mic, X, Image as ImageIcon, File as FileIcon, Loader2, Video, Cloud, Share2, Users, Info, UserPlus, UploadCloud, Reply } from 'lucide-react';
+import { MessageContextMenu, ContextMenuItem } from './ContextMenu';
+import { Send, Smile, Paperclip, MoreVertical, MessageSquare, Trash2, ChevronLeft, Mic, X, Image as ImageIcon, File as FileIcon, Loader2, Video, Cloud, Share2, Users, Info, UserPlus, UploadCloud, Reply, MoreHorizontal, Copy } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, getUserDisplayName, formatLastSeen, generateThumbnail, isUserOnline } from '../lib/utils';
 import { UserName } from './UserName';
@@ -38,6 +39,8 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
   const [showMenu, setShowMenu] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingActiveRef = useRef(false); // «печатает» уже отправлено
+  const typingSentAtRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -156,6 +159,10 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
       if (unsubscribeProfile) unsubscribeProfile();
       if (unsubscribeTyping) unsubscribeTyping();
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      if (typingActiveRef.current) {
+        typingActiveRef.current = false;
+        chatService.setTypingStatus(chatId, user.uid, false);
+      }
       unsubscribeTransfers();
     };
   }, [chatId, user]);
@@ -168,17 +175,97 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
     setInput(e.target.value);
     
     if (user && chatId) {
-      // Set typing to true
-      chatService.setTypingStatus(chatId, user.uid, true);
+      // «Печатает» пишем в Firestore один раз, а не на каждую клавишу (экономит дневной лимит записей).
+      // Повтор раз в 5 секунд, пока человек печатает: собеседник считает признак свежим 10 секунд.
+      const now = Date.now();
+      if (!typingActiveRef.current || now - typingSentAtRef.current > 5000) {
+        typingActiveRef.current = true;
+        typingSentAtRef.current = now;
+        chatService.setTypingStatus(chatId, user.uid, true);
+      }
 
-      // Clear existing timeout
+      // Сбрасываем признак после 3 секунд без ввода (одна запись)
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-
-      // Set timeout to reset typing status after 3 seconds of inactivity
       typingTimeoutRef.current = setTimeout(() => {
-        chatService.setTypingStatus(chatId, user.uid, false);
+        if (typingActiveRef.current) {
+          typingActiveRef.current = false;
+          chatService.setTypingStatus(chatId, user.uid, false);
+        }
       }, 3000);
     }
+  };
+
+  // --- Контекстное меню сообщения (правый клик, кнопка «⋯», долгое нажатие) ---
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
+  const longPressRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    setCtxMenu(null);
+  }, [chatId]);
+
+  const copyText = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+      } catch {
+        // буфер обмена недоступен
+      }
+      document.body.removeChild(ta);
+    }
+  };
+
+  const menuItemsFor = (msg: Message): ContextMenuItem[] => {
+    const items: ContextMenuItem[] = [
+      { id: 'reply', label: 'Ответить', icon: <Reply className="w-4 h-4" />, onClick: () => startReply(msg) },
+    ];
+    const selected = window.getSelection()?.toString().trim();
+    const copyable = selected || (msg.type === 'text' ? msg.text || '' : '');
+    if (copyable) {
+      items.push({
+        id: 'copy',
+        label: selected ? 'Копировать выделенное' : 'Копировать текст',
+        icon: <Copy className="w-4 h-4" />,
+        onClick: () => void copyText(copyable),
+      });
+    }
+    if (msg.senderId === user?.uid) {
+      items.push({
+        id: 'delete',
+        label: 'Удалить',
+        icon: <Trash2 className="w-4 h-4" />,
+        danger: true,
+        onClick: () => void handleDeleteMessage(msg.id),
+      });
+    }
+    return items;
+  };
+
+  const openMessageMenu = (msg: Message, x: number, y: number) => setCtxMenu({ x, y, items: menuItemsFor(msg) });
+
+  const cancelLongPress = () => {
+    if (longPressRef.current !== null) {
+      clearTimeout(longPressRef.current);
+      longPressRef.current = null;
+    }
+  };
+
+  const startLongPress = (msg: Message, e: React.TouchEvent) => {
+    const t = e.touches[0];
+    if (!t) return;
+    const { clientX, clientY } = t;
+    cancelLongPress();
+    longPressRef.current = window.setTimeout(() => {
+      longPressRef.current = null;
+      openMessageMenu(msg, clientX, clientY);
+    }, 500);
   };
 
   // --- Ответ на сообщение ---
@@ -221,9 +308,12 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
     setInput('');
     setReplyingTo(null);
     
-    // Clear typing indicator immediately
+    // Убираем «печатает» сразу, но только если оно было отправлено
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    chatService.setTypingStatus(chatId, user.uid, false);
+    if (typingActiveRef.current) {
+      typingActiveRef.current = false;
+      chatService.setTypingStatus(chatId, user.uid, false);
+    }
 
     await chatService.sendMessage(chatId, user.uid, getUserDisplayName(profile as UserProfile) || user.displayName || 'Anonymous', { text, type: 'text', replyTo: reply || undefined });
   };
@@ -732,6 +822,14 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                   </div>
                 )}
                 <div
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    openMessageMenu(msg, e.clientX, e.clientY);
+                  }}
+                  onTouchStart={(e) => startLongPress(msg, e)}
+                  onTouchMove={cancelLongPress}
+                  onTouchEnd={cancelLongPress}
+                  onTouchCancel={cancelLongPress}
                   className={cn(
                     "px-4 py-2.5 rounded-2xl shadow-sm text-sm relative transition-all duration-300",
                     isMe 
@@ -740,8 +838,8 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                     (msg.type === 'image' || msg.type === 'voice' || msg.type === 'file') && "p-1.5"
                   )}
                 >
-                  {/* Кнопка «Ответить»: появляется при наведении на сообщение */}
-                  <div className={cn("absolute inset-y-0 w-10 flex items-center justify-center", isMe ? "-left-10" : "-right-10")}>
+                  {/* Кнопки «Ответить» и «⋯» (меню): появляются при наведении на сообщение */}
+                  <div className={cn("absolute inset-y-0 w-[72px] flex items-center justify-center gap-1", isMe ? "-left-[72px] flex-row-reverse" : "-right-[72px]")}>
                     <button
                       type="button"
                       onClick={() => startReply(msg)}
@@ -750,6 +848,18 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                       className="p-1.5 rounded-full bg-black/10 dark:bg-white/10 text-gray-500 dark:text-gray-300 hover:text-blue-500 opacity-0 group-hover/msg:opacity-100 focus:opacity-100 transition-opacity"
                     >
                       <Reply className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        const r = e.currentTarget.getBoundingClientRect();
+                        openMessageMenu(msg, isMe ? r.right : r.left, r.bottom + 4);
+                      }}
+                      title="Ещё"
+                      aria-label="Меню сообщения"
+                      className="p-1.5 rounded-full bg-black/10 dark:bg-white/10 text-gray-500 dark:text-gray-300 hover:text-blue-500 opacity-0 group-hover/msg:opacity-100 focus:opacity-100 transition-opacity"
+                    >
+                      <MoreHorizontal className="w-4 h-4" />
                     </button>
                   </div>
                   {msg.replyTo && (
@@ -783,16 +893,6 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                     "msg-meta flex flex-row items-center justify-end text-[9px] mt-1 font-sans text-right gap-1.5",
                     isMe ? "text-white/80 dark:text-black/80" : "text-gray-400 dark:text-gray-500"
                   )}>
-                    {isMe && (
-                      <button 
-                        onClick={() => handleDeleteMessage(msg.id)}
-                        className="mr-1 hover:text-red-300 dark:hover:text-red-600 transition-colors cursor-pointer"
-                        title="Удалить сообщение"
-                        type="button"
-                      >
-                        <Trash2 className="w-[10px] h-[10px]" />
-                      </button>
-                    )}
                     <span>{msg.timestamp && format(msg.timestamp.toDate(), 'HH:mm', { locale: ru })}</span>
                     {isMe && (
                       <MessageStatusIndicator
@@ -1017,6 +1117,18 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
           </form>
         )}
       </div>
+
+      <AnimatePresence>
+        {ctxMenu && (
+          <MessageContextMenu
+            key={`${ctxMenu.x}-${ctxMenu.y}`}
+            x={ctxMenu.x}
+            y={ctxMenu.y}
+            items={ctxMenu.items}
+            onClose={() => setCtxMenu(null)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Permanently mounted file inputs */}
       <input 

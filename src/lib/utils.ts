@@ -113,6 +113,6 @@ export function isUserOnline(user: UserProfile | null | undefined): boolean {
 
   if (isNaN(date.getTime())) return false;
   const diffInMinutes = (Date.now() - date.getTime()) / (1000 * 60);
-  // Considered online if heartbeat was received within the last 3 minutes
-  return diffInMinutes <= 3;
+  // Сигнал «в сети» приходит раз в 4 минуты (см. useAuth), поэтому считаем пользователя онлайн 6 минут
+  return diffInMinutes <= 6;
 }

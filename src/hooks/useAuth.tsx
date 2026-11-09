@@ -97,43 +97,79 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsOffline(true);
     });
 
+    // --- Статус «в сети» с минимумом записей в Firestore ---
+    // Лимит бесплатного плана: 20 000 записей в сутки на весь проект, поэтому:
+    //  - «в сети» пишем не чаще раза в 4 минуты (раньше каждые 45 секунд);
+    //  - пока нет действий мыши и клавиатуры 30 минут, запись прекращается (Mix в трее ночью ничего не пишет);
+    //  - сворачивание вкладки не пишет сразу: ждём минуту, вдруг пользователь вернётся;
+    //  - «не в сети» пишем один раз при выходе и только если до этого писали «в сети».
+    const HEARTBEAT_MS = 4 * 60 * 1000;
+    const IDLE_MS = 30 * 60 * 1000;
+    const MIN_GAP_MS = 60 * 1000;
+    const HIDDEN_GRACE_MS = 60 * 1000;
+
+    let lastStatus: 'online' | 'offline' | null = null;
+    let lastWrite = 0;
+    let lastActivity = Date.now();
+    let hiddenTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const writePresence = (status: 'online' | 'offline') => {
+      const now = Date.now();
+      if (status === 'offline' && lastStatus !== 'online') return; // нечего менять
+      if (status === 'online' && lastStatus === 'online' && now - lastWrite < MIN_GAP_MS) return; // слишком часто
+      lastStatus = status;
+      lastWrite = now;
+      setDoc(userRef, { status, lastSeen: serverTimestamp() }, { merge: true }).catch(console.error);
+    };
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        setDoc(userRef, { status: 'online', lastSeen: serverTimestamp() }, { merge: true }).catch(console.error);
-      } else {
-        setDoc(userRef, { status: 'offline', lastSeen: serverTimestamp() }, { merge: true }).catch(console.error);
+        if (hiddenTimer) {
+          clearTimeout(hiddenTimer);
+          hiddenTimer = null;
+        }
+        lastActivity = Date.now();
+        writePresence('online');
+      } else if (!hiddenTimer) {
+        hiddenTimer = setTimeout(() => {
+          hiddenTimer = null;
+          if (document.visibilityState !== 'visible') writePresence('offline');
+        }, HIDDEN_GRACE_MS);
       }
     };
 
-    let pingInterval: NodeJS.Timeout;
-    const startPing = () => {
-      pingInterval = setInterval(() => {
-        if (document.visibilityState === 'visible') {
-          setDoc(userRef, { status: 'online', lastSeen: serverTimestamp() }, { merge: true }).catch(console.error);
-        }
-      }, 45 * 1000); // Heartbeat every 45 seconds
+    // Любое действие пользователя: запоминаем время и, если пауза была долгой, сразу отмечаемся «в сети»
+    const handleActivity = () => {
+      const now = Date.now();
+      lastActivity = now;
+      if (document.visibilityState === 'visible' && now - lastWrite > HEARTBEAT_MS) writePresence('online');
     };
-    startPing();
 
-    const handleBeforeUnload = () => {
-      setDoc(userRef, { status: 'offline', lastSeen: serverTimestamp() }, { merge: true }).catch(console.error);
-    };
+    const pingInterval = setInterval(() => {
+      if (document.visibilityState === 'visible' && Date.now() - lastActivity < IDLE_MS) {
+        writePresence('online');
+      }
+    }, HEARTBEAT_MS);
+
+    const handleBeforeUnload = () => writePresence('offline');
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', handleBeforeUnload);
     window.addEventListener('pagehide', handleBeforeUnload);
+    const activityEvents = ['pointerdown', 'keydown', 'wheel', 'touchstart', 'mousemove'] as const;
+    activityEvents.forEach((ev) => window.addEventListener(ev, handleActivity, { passive: true }));
 
-    // Ensure status is updated if we become active
-    if (document.visibilityState === 'visible') {
-      handleVisibilityChange();
-    }
+    // Сразу после входа отмечаемся «в сети»
+    if (document.visibilityState === 'visible') writePresence('online');
 
     return () => {
       unsubscribeProfile();
       clearInterval(pingInterval);
+      if (hiddenTimer) clearTimeout(hiddenTimer);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('pagehide', handleBeforeUnload);
+      activityEvents.forEach((ev) => window.removeEventListener(ev, handleActivity));
       handleBeforeUnload();
     };
   }, [user?.uid]);

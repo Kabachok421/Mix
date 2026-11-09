@@ -6,6 +6,7 @@ import { useSyncExternalStore } from 'react';
 import { bgStore } from '../lib/bgStore';
 
 export type BgMode = 'default' | 'color' | 'gradient' | 'image';
+export type MenuAnim = 'off' | 'soft' | 'spring';
 
 export interface AppearanceSettings {
   // Цвета сообщений. null = стандартный цвет темы
@@ -27,6 +28,15 @@ export interface AppearanceSettings {
   glassBlur: number; // px
   glassSaturation: number; // %
   glassEdge: number; // яркость кромки, %
+  // Контекстное меню сообщения (отдельное стекло и анимация)
+  menuCustom: boolean; // false = стандартное стекло темы
+  menuTint: string;
+  menuOpacity: number; // %
+  menuBlur: number; // px
+  menuSaturation: number; // %
+  menuEdge: number; // %
+  menuRadius: number; // px
+  menuAnim: MenuAnim;
 }
 
 export const DEFAULT_APPEARANCE: AppearanceSettings = {
@@ -46,6 +56,14 @@ export const DEFAULT_APPEARANCE: AppearanceSettings = {
   glassBlur: 22,
   glassSaturation: 180,
   glassEdge: 60,
+  menuCustom: false,
+  menuTint: '#ffffff',
+  menuOpacity: 62,
+  menuBlur: 24,
+  menuSaturation: 180,
+  menuEdge: 65,
+  menuRadius: 18,
+  menuAnim: 'spring',
 };
 
 export const MAX_BG_BYTES = 6 * 1024 * 1024;
@@ -81,6 +99,14 @@ function sanitize(raw: any): AppearanceSettings {
     glassBlur: clamp(r.glassBlur, 0, 60, d.glassBlur),
     glassSaturation: clamp(r.glassSaturation, 100, 250, d.glassSaturation),
     glassEdge: clamp(r.glassEdge, 0, 100, d.glassEdge),
+    menuCustom: r.menuCustom === true,
+    menuTint: hexOr(r.menuTint, d.menuTint),
+    menuOpacity: clamp(r.menuOpacity, 0, 100, d.menuOpacity),
+    menuBlur: clamp(r.menuBlur, 0, 60, d.menuBlur),
+    menuSaturation: clamp(r.menuSaturation, 100, 250, d.menuSaturation),
+    menuEdge: clamp(r.menuEdge, 0, 100, d.menuEdge),
+    menuRadius: clamp(r.menuRadius, 6, 30, d.menuRadius),
+    menuAnim: ['off', 'soft', 'spring'].includes(r.menuAnim) ? r.menuAnim : d.menuAnim,
   };
 }
 
@@ -161,6 +187,34 @@ function apply() {
       root.style.removeProperty(v);
     }
   }
+
+  // Стекло контекстного меню
+  const menuVars = ['--menu-rgb', '--menu-a1', '--menu-a2', '--menu-blur', '--menu-sat', '--menu-edge', '--menu-radius', '--menu-fg'];
+  if (s.menuCustom) {
+    const a1 = s.menuOpacity / 100;
+    root.setAttribute('data-menu-custom', '');
+    root.style.setProperty('--menu-rgb', hexToRgb(s.menuTint));
+    root.style.setProperty('--menu-a1', a1.toFixed(3));
+    root.style.setProperty('--menu-a2', (a1 * 0.62).toFixed(3));
+    root.style.setProperty('--menu-blur', `${s.menuBlur}px`);
+    root.style.setProperty('--menu-sat', `${s.menuSaturation}%`);
+    root.style.setProperty('--menu-edge', (s.menuEdge / 100).toFixed(3));
+    root.style.setProperty('--menu-radius', `${s.menuRadius}px`);
+    // Цвет текста по яркости выбранного цвета стекла (если стекло достаточно плотное)
+    if (a1 >= 0.35) {
+      const n = parseInt(s.menuTint.slice(1), 16);
+      const lum = (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
+      root.setAttribute('data-menu-fg', '');
+      root.style.setProperty('--menu-fg', lum > 0.55 ? '#1f2937' : '#f3f4f6');
+    } else {
+      root.removeAttribute('data-menu-fg');
+      root.style.removeProperty('--menu-fg');
+    }
+  } else {
+    root.removeAttribute('data-menu-custom');
+    root.removeAttribute('data-menu-fg');
+    for (const v of menuVars) root.style.removeProperty(v);
+  }
 }
 
 function emit() {
@@ -213,7 +267,7 @@ export const appearance = {
   },
 
   // Сброс блока настроек
-  reset(section: 'messages' | 'background' | 'glass' | 'all') {
+  reset(section: 'messages' | 'background' | 'glass' | 'menu' | 'all') {
     const d = DEFAULT_APPEARANCE;
     let next = { ...state };
     if (section === 'messages' || section === 'all') {
@@ -226,6 +280,9 @@ export const appearance = {
     }
     if (section === 'glass' || section === 'all') {
       next = { ...next, glassCustom: false, glassTint: d.glassTint, glassOpacity: d.glassOpacity, glassBlur: d.glassBlur, glassSaturation: d.glassSaturation, glassEdge: d.glassEdge };
+    }
+    if (section === 'menu' || section === 'all') {
+      next = { ...next, menuCustom: false, menuTint: d.menuTint, menuOpacity: d.menuOpacity, menuBlur: d.menuBlur, menuSaturation: d.menuSaturation, menuEdge: d.menuEdge, menuRadius: d.menuRadius, menuAnim: d.menuAnim };
     }
     commit(next);
   },

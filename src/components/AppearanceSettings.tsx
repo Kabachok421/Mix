@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
-import { Palette, Image as ImageIcon, Upload, Trash2, RotateCcw, Droplets } from 'lucide-react';
-import { appearance, useAppearance, DEFAULT_APPEARANCE, BgMode } from '../services/appearanceService';
+import { Palette, Image as ImageIcon, Upload, Trash2, RotateCcw, Droplets, MousePointerClick, Play, Reply, Copy } from 'lucide-react';
+import { appearance, useAppearance, DEFAULT_APPEARANCE, BgMode, MenuAnim } from '../services/appearanceService';
+import { ContextMenuPanel, ContextMenuItem } from './ContextMenu';
 import { cn } from '../lib/utils';
 
 const card = 'p-3 rounded-2xl border border-gray-200 dark:border-[#333] space-y-3';
@@ -88,14 +89,28 @@ const BG_MODES: { id: BgMode; label: string }[] = [
   { id: 'image', label: 'Картинка' },
 ];
 
+const MENU_ANIMS: { id: MenuAnim; label: string }[] = [
+  { id: 'off', label: 'Нет' },
+  { id: 'soft', label: 'Плавная' },
+  { id: 'spring', label: 'Пружинная' },
+];
+
+const PREVIEW_ITEMS: ContextMenuItem[] = [
+  { id: 'reply', label: 'Ответить', icon: <Reply className="w-4 h-4" />, onClick: () => {} },
+  { id: 'copy', label: 'Копировать', icon: <Copy className="w-4 h-4" />, onClick: () => {} },
+  { id: 'delete', label: 'Удалить', icon: <Trash2 className="w-4 h-4" />, danger: true, onClick: () => {} },
+];
+
 export function AppearanceSettings() {
   const s = useAppearance();
+  const [previewKey, setPreviewKey] = useState(0); // меняем ключ, чтобы проиграть анимацию меню заново
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Любое изменение стекла включает «свои параметры»
   const setGlass = (patch: Partial<typeof s>) => appearance.update({ glassCustom: true, ...patch });
+  const setMenu = (patch: Partial<typeof s>) => appearance.update({ menuCustom: true, ...patch });
 
   const pickImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -251,6 +266,65 @@ export function AppearanceSettings() {
         <SliderRow label="Размытие" value={s.glassBlur} min={0} max={60} unit=" px" onChange={(v) => setGlass({ glassBlur: v })} />
         <SliderRow label="Насыщенность" value={s.glassSaturation} min={100} max={250} unit="%" onChange={(v) => setGlass({ glassSaturation: v })} />
         <SliderRow label="Яркость кромки" value={s.glassEdge} min={0} max={100} unit="%" onChange={(v) => setGlass({ glassEdge: v })} />
+      </div>
+
+      {/* Контекстное меню сообщения */}
+      <div className={card}>
+        <div className="flex items-center justify-between">
+          <p className={cn(subTitle, 'flex items-center gap-2')}>
+            <MousePointerClick className="w-4 h-4 text-gray-400" />
+            Меню сообщения
+          </p>
+          <button type="button" onClick={() => appearance.reset('menu')} className={smallBtn}>
+            <RotateCcw className="w-3 h-3" />
+            Сбросить
+          </button>
+        </div>
+        <p className={hint}>Открывается правым кликом по сообщению или кнопкой «⋯» рядом с ним (долгое нажатие на сенсорном экране).</p>
+
+        <div className="chat-surface relative h-44 overflow-hidden rounded-2xl border border-gray-200 dark:border-[#333] bg-[#fafafa] dark:bg-[#080808]">
+          <div className="msg-theirs absolute left-3 top-3 px-3 py-2 rounded-2xl rounded-tl-none text-xs shadow-sm bg-white dark:bg-[#1e1e1e] border border-gray-100 dark:border-[#333] text-gray-800 dark:text-gray-200">
+            Сообщение, к которому открыто меню
+          </div>
+          <div className="msg-mine absolute right-3 bottom-3 px-3 py-2 rounded-2xl rounded-tr-none text-xs shadow-md bg-[#1a1a1a] dark:bg-[#e5e5e0] text-white dark:text-black">
+            Ещё одно сообщение для размытия
+          </div>
+          <ContextMenuPanel key={previewKey} items={PREVIEW_ITEMS} anim={s.menuAnim} className="absolute left-10 top-10 w-52" />
+        </div>
+
+        <div className="grid grid-cols-4 gap-1.5">
+          {MENU_ANIMS.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              onClick={() => {
+                appearance.update({ menuAnim: a.id });
+                setPreviewKey((k) => k + 1);
+              }}
+              className={cn(
+                'py-1.5 rounded-xl text-[11px] font-medium border transition-all',
+                s.menuAnim === a.id
+                  ? 'border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                  : 'border-gray-200 dark:border-[#333] text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#252525]'
+              )}
+            >
+              {a.label}
+            </button>
+          ))}
+          <button type="button" onClick={() => setPreviewKey((k) => k + 1)} className={cn(smallBtn, 'px-0')} title="Показать анимацию ещё раз">
+            <Play className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <p className={hint}>
+          {s.menuCustom ? 'Свои параметры стекла для меню.' : 'Сейчас стандартное стекло темы. Подвиньте любой ползунок, чтобы настроить своё.'}
+        </p>
+        <ColorRow label="Цвет стекла" value={s.menuCustom ? s.menuTint : null} fallback={s.menuTint} onChange={(v) => (v ? setMenu({ menuTint: v }) : appearance.reset('menu'))} />
+        <SliderRow label="Прозрачность (плотность цвета)" value={s.menuOpacity} min={0} max={100} unit="%" onChange={(v) => setMenu({ menuOpacity: v })} />
+        <SliderRow label="Размытие" value={s.menuBlur} min={0} max={60} unit=" px" onChange={(v) => setMenu({ menuBlur: v })} />
+        <SliderRow label="Насыщенность" value={s.menuSaturation} min={100} max={250} unit="%" onChange={(v) => setMenu({ menuSaturation: v })} />
+        <SliderRow label="Яркость кромки" value={s.menuEdge} min={0} max={100} unit="%" onChange={(v) => setMenu({ menuEdge: v })} />
+        <SliderRow label="Скругление углов" value={s.menuRadius} min={6} max={30} unit=" px" onChange={(v) => setMenu({ menuRadius: v })} />
       </div>
 
       <button type="button" onClick={() => appearance.reset('all')} className={cn(smallBtn, 'w-full')}>
