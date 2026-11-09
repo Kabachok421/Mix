@@ -18,7 +18,8 @@ import { CallManager } from './components/CallManager';
 import { UserName } from './components/UserName';
 import { InAppNotificationToast } from './components/InAppNotificationToast';
 import { NotificationSettings } from './components/NotificationSettings';
-import { AppearanceSettings } from './components/AppearanceSettings';
+import SettingsPanel from './components/SettingsPanel';
+import { useUpdater } from './hooks/useUpdater';
 import { notificationService } from './services/notificationService';
 import { chatService } from './services/chatService';
 import { UserProfile } from './types';
@@ -26,6 +27,9 @@ import { UserProfile } from './types';
 export default function App() {
   const { user, profile, loading, isOffline, logout } = useAuth();
   const { theme, setTheme } = useTheme();
+  const updater = useUpdater();
+  // Есть новая версия или она уже скачана: показываем точку на шестерёнке
+  const updateReady = updater.state?.phase === 'available' || updater.state?.phase === 'downloaded';
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
@@ -184,10 +188,16 @@ export default function App() {
               </button>
                <button 
                   onClick={() => setShowSettings(true)}
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-[#222] rounded-full transition-colors text-gray-500 dark:text-gray-400 active:scale-95"
-                  title="Настройки"
+                  className="relative p-2 hover:bg-gray-100 dark:hover:bg-[#222] rounded-full transition-colors text-gray-500 dark:text-gray-400 active:scale-95"
+                  title={updateReady ? 'Настройки: есть обновление' : 'Настройки'}
                >
                 <Settings className="w-5 h-5" />
+                {updateReady && (
+                  <span className="absolute top-1.5 right-1.5 flex w-2.5 h-2.5" aria-label="Есть обновление">
+                    <span className="absolute inline-flex w-full h-full rounded-full bg-blue-500 opacity-60 animate-ping" />
+                    <span className="relative inline-flex w-2.5 h-2.5 rounded-full bg-blue-500" />
+                  </span>
+                )}
               </button>
             </div>
           </div>
@@ -276,130 +286,14 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] max-w-sm md:max-w-4xl max-h-[90vh] flex flex-col glass-panel rounded-[32px] z-[101] overflow-hidden"
             >
-              <div className="p-6 border-b border-gray-100 dark:border-[#222] flex items-center justify-between shrink-0">
-                <h3 className="text-xl font-serif dark:text-white">Настройки</h3>
-                <button 
-                  onClick={() => setShowSettings(false)}
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-[#222] rounded-full text-gray-400"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="p-6 overflow-y-auto flex-1 flex flex-col md:flex-row gap-8">
-                {/* Левая колонка - настройки приложения */}
-                <div className="flex-1 space-y-6 flex flex-col">
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-medium mb-4 dark:text-white">Тема оформления</h4>
-                    <div className="flex flex-row md:flex-col gap-3">
-                      <button 
-                        onClick={() => setTheme('light')}
-                        className={cn(
-                          "flex flex-col md:flex-row items-center justify-center md:justify-start p-3 rounded-2xl border transition-all flex-1 md:flex-none text-center md:text-left",
-                          theme === 'light' ? "border-[#5A5A40] bg-gray-50" : "border-gray-200 hover:bg-gray-50 dark:border-[#333] dark:hover:bg-[#1a1a1a]"
-                        )}
-                      >
-                        <Sun className="w-5 h-5 text-orange-500 mr-0 md:mr-3 mb-2 md:mb-0" />
-                        <span className="text-xs md:text-sm font-medium dark:text-gray-300">Светлая</span>
-                      </button>
-                      
-                      <button 
-                        onClick={() => setTheme('dark')}
-                        className={cn(
-                          "flex flex-col md:flex-row items-center justify-center md:justify-start p-3 rounded-2xl border transition-all flex-1 md:flex-none text-center md:text-left",
-                          theme === 'dark' ? "border-gray-400 bg-gray-800 text-white" : "border-gray-200 dark:border-[#333] hover:bg-gray-100 dark:hover:bg-[#1a1a1a]"
-                        )}
-                      >
-                        <Moon className="w-5 h-5 text-blue-400 mr-0 md:mr-3 mb-2 md:mb-0" />
-                        <span className="text-xs md:text-sm font-medium dark:text-gray-300">Тёмная</span>
-                      </button>
-                      
-                      <button 
-                        onClick={() => setTheme('ocean')}
-                        className={cn(
-                          "flex flex-col md:flex-row items-center justify-center md:justify-start p-3 rounded-2xl border transition-all flex-1 md:flex-none text-center md:text-left",
-                          theme === 'ocean' ? "border-cyan-400 bg-[#041f2e] text-white shadow-[0_0_10px_rgba(0,255,255,0.2)]" : "border-gray-200 dark:border-[#333] hover:bg-gray-100 dark:hover:bg-[#1a1a1a]"
-                        )}
-                      >
-                        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 shadow-[0_0_8px_rgba(0,255,255,0.5)] mr-0 md:mr-3 mb-2 md:mb-0" />
-                        <span className="text-xs md:text-sm font-medium dark:text-gray-300">Ocean</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <NotificationSettings />
-
-                  <AppearanceSettings />
-
-                  {/* What's New Button */}
-                  <button
-                    onClick={() => setShowChangelog(true)}
-                    className="w-full flex items-center justify-between p-3 rounded-2xl border border-gray-200 dark:border-[#333] hover:bg-gray-50 dark:hover:bg-[#202020] transition-all text-xs font-medium text-gray-700 dark:text-gray-300"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <Sparkles className="w-4 h-4 text-amber-500" />
-                      <span>Что нового в мессенджере</span>
-                    </div>
-                    <span className="text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full font-bold">
-                      Обновления
-                    </span>
-                  </button>
-                  
-                  <div className="hidden md:block mt-auto pt-6">
-                    {isAdmin && (
-                      <button
-                        onClick={() => setActiveSettingsTab(activeSettingsTab === 'admin' ? 'profile' : 'admin')}
-                        className={cn(
-                          "w-full flex items-center justify-center p-3 rounded-xl border transition-all mb-4 text-sm font-medium",
-                          activeSettingsTab === 'admin' ? "bg-[#5A5A40] text-white border-transparent dark:bg-[#A0A080] dark:text-[#1a1a1a]" : "border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-[#333] dark:text-gray-300 dark:hover:bg-[#1a1a1a]"
-                        )}
-                      >
-                        <Shield className="w-4 h-4 mr-2" />
-                        {activeSettingsTab === 'admin' ? 'Вернуться в профиль' : 'Админ-панель'}
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setShowChangelog(true)}
-                      className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 uppercase tracking-widest text-center md:text-left transition-colors cursor-pointer w-full text-left"
-                      title="Нажмите, чтобы посмотреть историю обновлений"
-                    >
-                      {appVersionName}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Правая колонка - профиль / админка */}
-                <div className="flex-[1.5] md:border-l md:border-t-0 border-t border-gray-100 dark:border-[#222] pt-6 md:pt-0 md:pl-8">
-                  {activeSettingsTab === 'admin' && isAdmin ? (
-                    <AdminPanel />
-                  ) : (
-                    <>
-                      <h4 className="text-sm font-medium mb-6 dark:text-white">Редактировать профиль</h4>
-                      <SetupProfile onComplete={() => setShowSettings(false)} fullPage={false} />
-                    </>
-                  )}
-                </div>
-
-                <div className="md:hidden mt-4 pt-4 border-t border-gray-100 dark:border-[#222]">
-                  {isAdmin && (
-                    <button
-                      onClick={() => setActiveSettingsTab(activeSettingsTab === 'admin' ? 'profile' : 'admin')}
-                      className={cn(
-                        "w-full flex items-center justify-center p-3 rounded-xl border transition-all mb-4 text-sm font-medium",
-                        activeSettingsTab === 'admin' ? "bg-[#5A5A40] text-white border-transparent dark:bg-[#A0A080] dark:text-[#1a1a1a]" : "border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-[#333] dark:text-gray-300 dark:hover:bg-[#1a1a1a]"
-                      )}
-                    >
-                      <Shield className="w-4 h-4 mr-2" />
-                      {activeSettingsTab === 'admin' ? 'Профиль' : 'Админ-панель'}
-                    </button>
-                  )}
-                  <button
-                    onClick={() => setShowChangelog(true)}
-                    className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 uppercase tracking-widest text-center w-full"
-                  >
-                    {appVersionName}
-                  </button>
-                </div>
-              </div>
+              <SettingsPanel
+                theme={theme}
+                setTheme={setTheme}
+                isAdmin={isAdmin}
+                appVersionName={appVersionName}
+                onClose={() => setShowSettings(false)}
+                onOpenChangelog={() => setShowChangelog(true)}
+              />
             </motion.div>
           </>
         )}

@@ -126,6 +126,7 @@ function createWindow() {
     backgroundColor: '#0b0b10',
     autoHideMenuBar: true,
     webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'), // мост обновлений для окна настроек
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -224,9 +225,9 @@ function createTray() {
   const build = () =>
     Menu.buildFromTemplate([
       { label: 'Открыть Mix', click: showWindow },
-      updater && updater.getState().phase === 'downloaded'
-        ? { label: 'Перезапустить для обновления', click: () => updater.restart() }
-        : { label: 'Проверить обновления', click: () => updater && updater.checkNow(true) },
+      ...(updater && updater.getState().phase === 'downloaded'
+        ? [{ label: 'Перезапустить для обновления', click: () => updater.restart() }]
+        : []),
       {
         label: 'Запускать при входе в Windows',
         type: 'checkbox',
@@ -268,6 +269,7 @@ async function boot() {
   setupSession(session.defaultSession);
   createWindow();
   updater = initUpdater({
+    getWindow: () => mainWindow,
     beforeInstall: async () => {
       isQuitting = true; // иначе закрытие окна лишь свернёт его в трей и установка не начнётся
       await goOffline();
