@@ -71,12 +71,6 @@ export interface Message {
   status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
 }
 
-export interface AppConfig {
-  versionName: string;
-  updatedAt?: Timestamp;
-  updatedBy?: string;
-}
-
 export interface ChangelogItem {
   id: string;
   version: string;

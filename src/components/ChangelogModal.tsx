@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ChangelogItem, AppConfig } from '../types';
+import { ChangelogItem } from '../types';
 import { chatService } from '../services/chatService';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Sparkles, Clock, CheckCircle2, ChevronRight, Layers } from 'lucide-react';

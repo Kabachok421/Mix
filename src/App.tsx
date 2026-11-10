@@ -30,11 +30,12 @@ export default function App() {
   const updater = useUpdater();
   // Есть новая версия или она уже скачана: показываем точку на шестерёнке
   const updateReady = updater.state?.phase === 'available' || updater.state?.phase === 'downloaded';
+  // Версия установленного приложения (в браузере её нет, и номер нигде не показывается)
+  const installedVersionLabel = updater.state?.currentVersion ? `Mix ${updater.state.currentVersion}` : undefined;
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState<'profile' | 'admin'>('profile');
-  const [appVersionName, setAppVersionName] = useState<string>('Mix Messenger v1.1');
   const [showChangelog, setShowChangelog] = useState(false);
   
   const isAdmin = user?.email === 'kko593764@gmail.com';
@@ -42,16 +43,6 @@ export default function App() {
   const lastKnownTimestampsRef = useRef<Record<string, number>>({});
   const isInitialLoadRef = useRef(true);
   const userProfilesCacheRef = useRef<Record<string, UserProfile>>({});
-
-  // Real-time app version name listener
-  useEffect(() => {
-    const unsubConfig = chatService.subscribeToAppConfig((cfg) => {
-      if (cfg?.versionName) {
-        setAppVersionName(cfg.versionName);
-      }
-    });
-    return () => unsubConfig();
-  }, []);
 
   // When activeChatId changes or window gets focus, clear title flashing
   useEffect(() => {
@@ -290,7 +281,6 @@ export default function App() {
                 theme={theme}
                 setTheme={setTheme}
                 isAdmin={isAdmin}
-                appVersionName={appVersionName}
                 onClose={() => setShowSettings(false)}
                 onOpenChangelog={() => setShowChangelog(true)}
               />
@@ -315,7 +305,7 @@ export default function App() {
           <ChangelogModal
             isOpen={showChangelog}
             onClose={() => setShowChangelog(false)}
-            appVersionName={appVersionName}
+            appVersionName={installedVersionLabel}
           />
         )}
       </AnimatePresence>

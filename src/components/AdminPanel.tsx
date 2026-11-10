@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { UserProfile, Chat, AppConfig, ChangelogItem } from '../types';
+import { UserProfile, Chat, ChangelogItem } from '../types';
 import { chatService } from '../services/chatService';
 import { useAuth } from '../hooks/useAuth';
+import { useUpdater } from '../hooks/useUpdater';
+import { PlannedUpdatesAdmin } from './PlannedUpdatesAdmin';
 import { isUserOnline, formatLastSeen } from '../lib/utils';
 import { 
   Shield, 
@@ -31,6 +33,9 @@ import { motion, AnimatePresence } from 'motion/react';
 type AdminTab = 'users' | 'groups' | 'updates';
 
 export default function AdminPanel() {
+  const updater = useUpdater();
+  // Номер установленной сборки (в браузере нет): подставляется в запись об изменениях, если не указан свой
+  const installedVersion = updater.state?.currentVersion;
   const { user: currentAuthUser } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>('users');
   
@@ -38,7 +43,6 @@ export default function AdminPanel() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [groupChats, setGroupChats] = useState<Chat[]>([]);
   const [changelogs, setChangelogs] = useState<ChangelogItem[]>([]);
-  const [appConfig, setAppConfig] = useState<AppConfig | null>(null);
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -60,8 +64,6 @@ export default function AdminPanel() {
   const [isDeletingGroup, setIsDeletingGroup] = useState(false);
 
   // Version editing state
-  const [versionInput, setVersionInput] = useState('');
-  const [isSavingVersion, setIsSavingVersion] = useState(false);
 
   // New Changelog state
   const [newChangelogVersion, setNewChangelogVersion] = useState('');
@@ -82,21 +84,14 @@ export default function AdminPanel() {
     try {
       setLoading(true);
       setError('');
-      const [usersList, groupsList, config, logs] = await Promise.all([
+      const [usersList, groupsList, logs] = await Promise.all([
         chatService.getAllUsers(),
         chatService.getAllGroupChats(),
-        chatService.getAppConfig(),
         chatService.getChangelogs()
       ]);
 
       if (usersList) setUsers(usersList);
       if (groupsList) setGroupChats(groupsList);
-      if (config) {
-        setAppConfig(config);
-        setVersionInput(config.versionName || '');
-      } else {
-        setVersionInput('Mix Messenger v1.1');
-      }
       if (logs) setChangelogs(logs);
     } catch (err: any) {
       setError(err.message || 'Ошибка загрузки данных админ-панели');
@@ -108,22 +103,12 @@ export default function AdminPanel() {
   useEffect(() => {
     fetchData();
 
-    // Subscribe to real-time changes of appConfig and changelogs
-    const unsubConfig = chatService.subscribeToAppConfig((cfg) => {
-      if (cfg) {
-        setAppConfig(cfg);
-        if (!isSavingVersion) {
-          setVersionInput(cfg.versionName || '');
-        }
-      }
-    });
-
+    // Subscribe to real-time changes of changelogs
     const unsubChangelogs = chatService.subscribeToChangelogs((items) => {
       setChangelogs(items);
     });
 
     return () => {
-      unsubConfig();
       unsubChangelogs();
     };
   }, []);
@@ -197,21 +182,6 @@ export default function AdminPanel() {
     }
   };
 
-  const handleSaveVersion = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!versionInput.trim()) return;
-
-    try {
-      setIsSavingVersion(true);
-      await chatService.updateAppConfig({ versionName: versionInput.trim() });
-      showNotification('Название версии приложения успешно обновлено!');
-    } catch (err: any) {
-      alert(`Не удалось обновить версию: ${err.message}`);
-    } finally {
-      setIsSavingVersion(false);
-    }
-  };
-
   const handlePublishChangelog = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newChangelogTitle.trim() || !newChangelogContent.trim()) {
@@ -222,7 +192,7 @@ export default function AdminPanel() {
     try {
       setIsPublishingChangelog(true);
       await chatService.addChangelog({
-        version: newChangelogVersion.trim() || versionInput.trim() || 'v1.0',
+        version: newChangelogVersion.trim() || (installedVersion ? `v${installedVersion}` : 'Обновление'),
         title: newChangelogTitle.trim(),
         content: newChangelogContent.trim(),
         broadcastToChats
@@ -705,41 +675,10 @@ export default function AdminPanel() {
       {/* TAB 3: APP VERSION & CHANGELOG */}
       {activeTab === 'updates' && (
         <div className="space-y-6 overflow-y-auto max-h-[550px] pr-1 custom-scrollbar">
-          {/* Section 1: Application Version Name */}
-          <div className="p-4 bg-gray-50/70 dark:bg-[#181818]/60 border border-gray-100 dark:border-[#2a2a2a] rounded-2xl space-y-3">
-            <div className="flex items-center gap-2">
-              <Layers className="w-4 h-4 text-[#5A5A40] dark:text-[#A0A080]" />
-              <h4 className="text-sm font-semibold dark:text-white">Название версии приложения</h4>
-            </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Это название и номер версии отображаются у всех пользователей в настройках и подвале мессенджера.
-            </p>
+          {/* Календарь следующих обновлений: даты и что будет добавлено */}
+          <PlannedUpdatesAdmin />
 
-            <form onSubmit={handleSaveVersion} className="flex gap-2">
-              <input
-                type="text"
-                value={versionInput}
-                onChange={(e) => setVersionInput(e.target.value)}
-                placeholder="Например: Mix Messenger v1.2"
-                className="flex-1 bg-white dark:bg-[#202020] border border-gray-200 dark:border-[#3a3a3a] rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-[#5A5A40]/30 dark:text-white"
-                required
-              />
-              <button
-                type="submit"
-                disabled={isSavingVersion}
-                className="px-4 py-2 bg-[#5A5A40] dark:bg-[#A0A080] text-white dark:text-gray-900 rounded-xl text-xs font-semibold hover:opacity-90 transition-opacity flex items-center gap-1.5 shrink-0"
-              >
-                {isSavingVersion ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Check className="w-3.5 h-3.5" />
-                )}
-                <span>Сохранить</span>
-              </button>
-            </form>
-          </div>
-
-          {/* Section 2: Write Release Notes / Messenger Updates */}
+          {/* Написать об изменениях в мессенджере (версию приложения вручную менять нельзя: это номер установленной сборки) */}
           <div className="p-4 bg-gray-50/70 dark:bg-[#181818]/60 border border-gray-100 dark:border-[#2a2a2a] rounded-2xl space-y-4">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-amber-500" />
@@ -753,13 +692,13 @@ export default function AdminPanel() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div className="sm:col-span-1">
                   <label className="block text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1">
-                    Версия
+                    Версия (необязательно)
                   </label>
                   <input
                     type="text"
                     value={newChangelogVersion}
                     onChange={(e) => setNewChangelogVersion(e.target.value)}
-                    placeholder="Например: v1.2"
+                    placeholder={installedVersion ? `v${installedVersion}` : 'Например: v1.2'}
                     className="w-full bg-white dark:bg-[#202020] border border-gray-200 dark:border-[#3a3a3a] rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-[#5A5A40]/30 dark:text-white"
                   />
                 </div>

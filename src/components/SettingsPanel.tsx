@@ -6,6 +6,7 @@ import AdminPanel from './AdminPanel';
 import { NotificationSettings } from './NotificationSettings';
 import { AppearanceSettings } from './AppearanceSettings';
 import { UpdateSettings } from './UpdateSettings';
+import { BannerSettings } from './BannerSettings';
 import { useUpdater } from '../hooks/useUpdater';
 import { cn } from '../lib/utils';
 
@@ -16,7 +17,6 @@ interface SettingsPanelProps {
   theme: string;
   setTheme: (t: ThemeId) => void;
   isAdmin: boolean;
-  appVersionName: string;
   onClose: () => void;
   onOpenChangelog: () => void;
 }
@@ -34,8 +34,10 @@ const THEMES: { id: ThemeId; label: string }[] = [
   { id: 'ocean', label: 'Ocean' },
 ];
 
-export default function SettingsPanel({ theme, setTheme, isAdmin, appVersionName, onClose, onOpenChangelog }: SettingsPanelProps) {
+export default function SettingsPanel({ theme, setTheme, isAdmin, onClose, onOpenChangelog }: SettingsPanelProps) {
   const updater = useUpdater();
+  // В приложении: номер установленной версии. В браузере номера нет, остаётся только «Что нового».
+  const versionLabel = updater.supported && updater.state?.currentVersion ? `Mix ${updater.state.currentVersion}` : 'Что нового';
   const [tab, setTab] = useState<TabId>('profile');
   const [dir, setDir] = useState(1);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -44,7 +46,7 @@ export default function SettingsPanel({ theme, setTheme, isAdmin, appVersionName
     { id: 'profile', label: 'Профиль', icon: UserIcon },
     { id: 'appearance', label: 'Внешний вид', icon: Palette },
     { id: 'notifications', label: 'Уведомления', icon: Bell },
-    ...(updater.supported ? [{ id: 'updates' as TabId, label: 'Обновления', icon: RefreshCw }] : []),
+    { id: 'updates', label: 'Обновления', icon: RefreshCw },
     ...(isAdmin ? [{ id: 'admin' as TabId, label: 'Админ-панель', icon: Shield }] : []),
   ];
 
@@ -121,7 +123,7 @@ export default function SettingsPanel({ theme, setTheme, isAdmin, appVersionName
             title="Нажмите, чтобы посмотреть историю обновлений"
             className="hidden md:block mt-auto pt-6 text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 uppercase tracking-widest text-left transition-colors px-3.5"
           >
-            {appVersionName}
+            {versionLabel}
           </button>
         </nav>
 
@@ -140,7 +142,8 @@ export default function SettingsPanel({ theme, setTheme, isAdmin, appVersionName
               {tab === 'profile' && (
                 <>
                   <h4 className="text-sm font-medium mb-6 dark:text-white">Редактировать профиль</h4>
-                  <div className="max-w-md">
+                  <div className="max-w-md space-y-6">
+                    <BannerSettings />
                     <SetupProfile onComplete={onClose} fullPage={false} />
                   </div>
                 </>
@@ -187,8 +190,8 @@ export default function SettingsPanel({ theme, setTheme, isAdmin, appVersionName
                 </div>
               )}
 
-              {tab === 'updates' && updater.supported && (
-                <UpdateSettings updater={updater} appVersionName={appVersionName} onOpenChangelog={onOpenChangelog} />
+              {tab === 'updates' && (
+                <UpdateSettings updater={updater} onOpenChangelog={onOpenChangelog} />
               )}
 
               {tab === 'admin' && isAdmin && <AdminPanel />}
@@ -204,7 +207,7 @@ export default function SettingsPanel({ theme, setTheme, isAdmin, appVersionName
           onClick={onOpenChangelog}
           className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 uppercase tracking-widest w-full text-center"
         >
-          {appVersionName}
+          {versionLabel}
         </button>
       </div>
     </div>

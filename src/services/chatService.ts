@@ -15,7 +15,7 @@ import {
   limit
 } from 'firebase/firestore';
 import { db, auth, handleFirestoreError } from '../lib/firebase';
-import { Chat, Message, UserProfile, AppConfig, ChangelogItem } from '../types';
+import { Chat, Message, UserProfile, ChangelogItem } from '../types';
 
 export const chatService = {
   // Get active chats for current user
@@ -612,46 +612,6 @@ export const chatService = {
     }
   },
 
-  getAppConfig: async (): Promise<AppConfig | null> => {
-    try {
-      const configRef = doc(db, 'app_config', 'global');
-      const snap = await getDoc(configRef);
-      if (snap.exists()) {
-        return snap.data() as AppConfig;
-      }
-      return null;
-    } catch (error) {
-      console.warn("Failed to get app config:", error);
-      return null;
-    }
-  },
-
-  updateAppConfig: async (config: Partial<AppConfig>) => {
-    try {
-      const configRef = doc(db, 'app_config', 'global');
-      await setDoc(configRef, {
-        ...config,
-        updatedAt: serverTimestamp(),
-        updatedBy: auth.currentUser?.email || auth.currentUser?.uid || 'admin'
-      }, { merge: true });
-    } catch (error) {
-      handleFirestoreError(error, 'update', 'app_config/global');
-    }
-  },
-
-  subscribeToAppConfig: (callback: (config: AppConfig | null) => void) => {
-    const configRef = doc(db, 'app_config', 'global');
-    return onSnapshot(configRef, (snap) => {
-      if (snap.exists()) {
-        callback(snap.data() as AppConfig);
-      } else {
-        callback(null);
-      }
-    }, (error) => {
-      console.warn("App config listener error:", error);
-    });
-  },
-
   getChangelogs: async (): Promise<ChangelogItem[]> => {
     try {
       const q = query(
@@ -692,19 +652,6 @@ export const chatService = {
         createdBy: auth.currentUser?.uid || 'admin',
         createdAt: serverTimestamp()
       });
-
-      // Update app_config version name if version provided
-      if (data.version.trim()) {
-        const configRef = doc(db, 'app_config', 'global');
-        const formattedVer = data.version.trim().toLowerCase().startsWith('mix') 
-          ? data.version.trim() 
-          : `Mix Messenger ${data.version.trim().startsWith('v') ? data.version.trim() : `v${data.version.trim()}`}`;
-        await setDoc(configRef, {
-          versionName: formattedVer,
-          updatedAt: serverTimestamp(),
-          updatedBy: auth.currentUser?.email || 'admin'
-        }, { merge: true });
-      }
 
       // If requested, broadcast to group chats as system announcement
       if (data.broadcastToChats && auth.currentUser) {

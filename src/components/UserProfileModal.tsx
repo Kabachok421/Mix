@@ -7,6 +7,7 @@ import { ru } from 'date-fns/locale';
 import { Avatar } from './Avatar';
 import { UserStatus } from './UserStatus';
 import { UserName } from './UserName';
+import { ProfileBanner } from './ProfileBanner';
 
 interface UserProfileModalProps {
   user: UserProfile;
@@ -30,6 +31,7 @@ export default function UserProfileModal({ user, onClose }: UserProfileModalProp
         className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm bg-white dark:bg-[#1a1a1a] rounded-[32px] shadow-2xl z-[201] overflow-hidden border border-[#e5e5e0] dark:border-[#333]"
       >
         <div className="relative h-48 bg-gradient-to-br from-[#e5e5e0] to-gray-100 dark:from-[#222] dark:to-[#111]">
+          <ProfileBanner uid={user.uid} />
           <button 
             onClick={onClose}
             className="absolute top-4 right-4 p-2 bg-black/10 dark:bg-black/30 hover:bg-black/20 dark:hover:bg-black/50 rounded-full text-white backdrop-blur-md transition-colors"

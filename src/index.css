@@ -134,7 +134,9 @@ html[data-chat-bg] .chat-surface {
   background-image: var(--chat-bg-image) !important;
   background-size: cover;
   background-position: center;
-  background-attachment: local;
+  background-repeat: no-repeat;
+  /* scroll = картинка закреплена за видимой областью чата и не растягивается на всю историю сообщений */
+  background-attachment: scroll;
 }
 
 /* Подсветка сообщения, к которому перешли по ответу */
