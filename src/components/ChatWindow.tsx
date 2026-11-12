@@ -769,7 +769,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
       </AnimatePresence>
 
       {/* Messages */}
-      <div className={cn("chat-surface flex-1 overflow-y-auto px-4 pt-24 space-y-4 bg-[#fafafa] dark:bg-[#080808] custom-scrollbar", replyingTo ? "pb-44" : "pb-28")}>
+      <div className={cn("chat-surface flex-1 overflow-y-auto flex flex-col px-4 pt-24 space-y-4 bg-[#fafafa] dark:bg-[#080808] custom-scrollbar", replyingTo ? "pb-44" : "pb-28")}>
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-gray-300 dark:text-gray-700 gap-4">
             <div className="w-20 h-20 rounded-full bg-gray-50 dark:bg-[#111] flex items-center justify-center border border-gray-100 dark:border-[#222] shadow-inner">
@@ -793,6 +793,8 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
             const isMe = msg.senderId === user?.uid;
             const senderProfile = groupMembersMap[msg.senderId];
             const senderDisplayName = senderProfile?.customName || senderProfile?.displayName || msg.senderName;
+            // У текста время стоит в углу рядом с последней строкой, у файлов, фото и голосовых под содержимым
+            const inlineMeta = msg.type !== 'voice' && msg.type !== 'image' && msg.type !== 'file';
 
             return (
               <motion.div
@@ -807,7 +809,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                 )}
               >
                 {!isMe && (
-                  <div className="flex items-center gap-1.5 ml-2">
+                  <div className="flex items-center gap-1.5 ml-2 select-none">
                     {isGroup && (
                       <Avatar 
                         src={senderProfile?.photoURL} 
@@ -831,37 +833,13 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                   onTouchEnd={cancelLongPress}
                   onTouchCancel={cancelLongPress}
                   className={cn(
-                    "px-4 py-2.5 rounded-2xl shadow-sm text-sm relative transition-all duration-300",
+                    "px-3.5 py-2 rounded-2xl shadow-sm text-sm leading-snug relative transition-all duration-300",
                     isMe 
                       ? "msg-mine bg-[#1a1a1a] dark:bg-[#e5e5e0] text-white dark:text-black rounded-tr-none shadow-md" 
                       : "msg-theirs bg-white dark:bg-[#1e1e1e] border border-gray-100 dark:border-[#333] text-gray-800 dark:text-gray-200 rounded-tl-none shadow-sm",
                     (msg.type === 'image' || msg.type === 'voice' || msg.type === 'file') && "p-1.5"
                   )}
                 >
-                  {/* Кнопки «Ответить» и «⋯» (меню): появляются при наведении на сообщение */}
-                  <div className={cn("absolute inset-y-0 w-[72px] flex items-center justify-center gap-1", isMe ? "-left-[72px] flex-row-reverse" : "-right-[72px]")}>
-                    <button
-                      type="button"
-                      onClick={() => startReply(msg)}
-                      title="Ответить"
-                      aria-label="Ответить"
-                      className="p-1.5 rounded-full bg-black/10 dark:bg-white/10 text-gray-500 dark:text-gray-300 hover:text-blue-500 opacity-0 group-hover/msg:opacity-100 focus:opacity-100 transition-opacity"
-                    >
-                      <Reply className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        const r = e.currentTarget.getBoundingClientRect();
-                        openMessageMenu(msg, isMe ? r.right : r.left, r.bottom + 4);
-                      }}
-                      title="Ещё"
-                      aria-label="Меню сообщения"
-                      className="p-1.5 rounded-full bg-black/10 dark:bg-white/10 text-gray-500 dark:text-gray-300 hover:text-blue-500 opacity-0 group-hover/msg:opacity-100 focus:opacity-100 transition-opacity"
-                    >
-                      <MoreHorizontal className="w-4 h-4" />
-                    </button>
-                  </div>
                   {msg.replyTo && (
                     <button
                       type="button"
@@ -887,10 +865,13 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                       <FileMessage type={msg.type} url={msg.url === 'p2p-sent' ? p2pFiles[msg.fileName || ''] : msg.url!} thumbnail={msg.thumbnail} fileName={msg.fileName} fileSize={msg.fileSize} isMe={isMe} />
                     )
                   ) : (
-                    msg.text
+                    <span className="whitespace-pre-wrap break-words">{msg.text}</span>
                   )}
+                  {/* Пустое место под время: если в последней строке текста нет места, время уходит на новую строку */}
+                  {inlineMeta && <span aria-hidden="true" className={cn("inline-block h-0 select-none", isMe ? "w-14" : "w-10")} />}
                   <div className={cn(
-                    "msg-meta flex flex-row items-center justify-end text-[9px] mt-1 font-sans text-right gap-1.5",
+                    "msg-meta select-none flex flex-row items-center text-[10px] font-sans leading-none gap-1",
+                    inlineMeta ? "absolute bottom-[7px] right-3.5" : "justify-end mt-1 text-right",
                     isMe ? "text-white/80 dark:text-black/80" : "text-gray-400 dark:text-gray-500"
                   )}>
                     <span>{msg.timestamp && format(msg.timestamp.toDate(), 'HH:mm', { locale: ru })}</span>
