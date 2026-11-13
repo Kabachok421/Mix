@@ -1,7 +1,7 @@
 // Баннеры профиля в Firestore: banners/{uid} (описание) и banners/{uid}/chunks/{версия_номер} (куски файла).
 // Описание читается при каждом открытии профиля (1 чтение), сам файл скачивается один раз на версию и кэшируется в IndexedDB.
 
-import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { BannerBackend, BannerCache, BannerMeta, createBannerService } from './bannerCore';
 
@@ -11,7 +11,11 @@ const backend: BannerBackend = {
     if (!snap.exists()) return null;
     const d = snap.data();
     if (typeof d.version !== 'number' || typeof d.mime !== 'string' || typeof d.chunks !== 'number') return null;
-    return { version: d.version, mime: d.mime, size: d.size, chunks: d.chunks } as BannerMeta;
+    return { version: d.version, mime: d.mime, size: d.size, chunks: d.chunks, zoom: d.zoom, cx: d.cx, cy: d.cy } as BannerMeta;
+  },
+
+  async updateTransform(uid, t) {
+    await updateDoc(doc(db, 'banners', uid), { zoom: t.zoom, cx: t.cx, cy: t.cy, updatedAt: serverTimestamp() });
   },
 
   async getChunk(uid, version, index) {

@@ -65,6 +65,7 @@ export interface Message {
   fileSize?: number;
   duration?: number; // for voice
   replyTo?: ReplyRef;
+  editedAt?: Timestamp; // когда сообщение изменили (есть только у изменённых)
   // Message delivery and read status indicators
   readBy?: string[];
   deliveredTo?: string[];

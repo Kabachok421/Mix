@@ -171,6 +171,35 @@ export function AppearanceSettings() {
             Сбросить
           </button>
         </div>
+        <div className="space-y-2.5">
+          <div className="grid grid-cols-2 gap-1.5">
+            {[
+              { id: false, label: 'Обычные' },
+              { id: true, label: 'Liquid Glass' },
+            ].map((o) => (
+              <button
+                key={String(o.id)}
+                type="button"
+                onClick={() => appearance.update({ bubbleGlass: o.id })}
+                className={cn(
+                  'py-1.5 rounded-xl text-[11px] font-medium border transition-all',
+                  s.bubbleGlass === o.id
+                    ? 'border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                    : 'border-gray-200 dark:border-[#333] text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#252525]'
+                )}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+          {s.bubbleGlass && (
+            <>
+              <SliderRow label="Прозрачность сообщений (плотность цвета)" value={s.bubbleGlassOpacity} min={20} max={95} unit="%" onChange={(v) => appearance.update({ bubbleGlassOpacity: v })} />
+              <SliderRow label="Размытие под сообщением" value={s.bubbleGlassBlur} min={0} max={40} unit=" px" onChange={(v) => appearance.update({ bubbleGlassBlur: v })} />
+              <p className={hint}>Стекло лучше всего видно, когда у чата есть фон: картинка или градиент.</p>
+            </>
+          )}
+        </div>
         <ColorRow label="Мои: фон" value={s.myBubble} fallback="#1a1a1a" onChange={(v) => appearance.update({ myBubble: v })} />
         <ColorRow label="Мои: текст" value={s.myText} fallback="#ffffff" onChange={(v) => appearance.update({ myText: v })} />
         <ColorRow label="Собеседника: фон" value={s.theirBubble} fallback="#ffffff" onChange={(v) => appearance.update({ theirBubble: v })} />

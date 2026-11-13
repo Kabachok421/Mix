@@ -13,3 +13,9 @@ contextBridge.exposeInMainWorld('mixUpdater', {
   download: () => ipcRenderer.send('updater:download'),
   restart: () => ipcRenderer.send('updater:restart'),
 });
+
+// Настройки приложения (запуск вместе с Windows)
+contextBridge.exposeInMainWorld('mixApp', {
+  getAutostart: () => ipcRenderer.invoke('app:get-autostart'),
+  setAutostart: (enabled) => ipcRenderer.invoke('app:set-autostart', enabled === true),
+});

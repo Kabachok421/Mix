@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { startServer } = require('./server.cjs');
 const { initUpdater } = require('./updater.cjs');
+const { initAppSettings } = require('./appSettings.cjs');
 
 const APP_ID = 'com.m3lts.mix';
 const PREFERRED_PORT = 47831; // фиксированный порт: у входа Firebase и у IndexedDB origin один и тот же
@@ -228,12 +229,6 @@ function createTray() {
       ...(updater && updater.getState().phase === 'downloaded'
         ? [{ label: 'Перезапустить для обновления', click: () => updater.restart() }]
         : []),
-      {
-        label: 'Запускать при входе в Windows',
-        type: 'checkbox',
-        checked: app.getLoginItemSettings().openAtLogin,
-        click: (item) => app.setLoginItemSettings({ openAtLogin: item.checked, args: ['--hidden'] }),
-      },
       { type: 'separator' },
       { label: 'Открыть журнал (mix.log)', click: () => shell.showItemInFolder(logFile) },
       {
@@ -275,6 +270,7 @@ async function boot() {
       await goOffline();
     },
   });
+  initAppSettings({ getWindow: () => mainWindow });
   createTray();
   if (fellBack) {
     dialog.showMessageBox({

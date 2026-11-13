@@ -266,3 +266,49 @@ html[data-menu-custom] .glass-menu {
 html[data-menu-fg] .glass-menu {
   color: var(--menu-fg);
 }
+
+/* ===== Liquid Glass для сообщений (включается в настройках) ===== */
+html[data-bubble-glass] .msg-mine { --tint: #1a1a1a; }
+html.dark[data-bubble-glass] .msg-mine { --tint: #e5e5e0; }
+html[data-bubble-glass][data-my-bubble] .msg-mine { --tint: var(--my-bubble); }
+html[data-bubble-glass] .msg-theirs { --tint: #ffffff; }
+html.dark[data-bubble-glass] .msg-theirs { --tint: #1e1e1e; }
+html[data-bubble-glass][data-their-bubble] .msg-theirs { --tint: var(--their-bubble); }
+
+html[data-bubble-glass] .msg-mine,
+html[data-bubble-glass] .msg-theirs {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--tint) var(--bubble-a1, 70%), transparent),
+    color-mix(in srgb, var(--tint) var(--bubble-a2, 44%), transparent)
+  ) !important;
+  -webkit-backdrop-filter: blur(var(--bubble-blur, 14px)) saturate(170%);
+  backdrop-filter: blur(var(--bubble-blur, 14px)) saturate(170%);
+  border: 1px solid rgb(255 255 255 / 0.28) !important;
+  box-shadow:
+    inset 0 1px 1px rgb(255 255 255 / 0.4),
+    inset 0 -1px 1px rgb(255 255 255 / 0.08),
+    0 8px 20px rgb(0 0 0 / 0.18) !important;
+}
+
+/* Цвет текста на стекле: по теме, а для своего цвета пузыря по его яркости. Свой цвет текста из настроек важнее. */
+html[data-bubble-glass]:not([data-my-text]) .msg-mine,
+html[data-bubble-glass]:not([data-my-text]) .msg-mine .msg-meta {
+  color: var(--my-fg-auto, #f9fafb) !important;
+}
+html.dark[data-bubble-glass]:not([data-my-text]) .msg-mine,
+html.dark[data-bubble-glass]:not([data-my-text]) .msg-mine .msg-meta {
+  color: var(--my-fg-auto, #0b0b0b) !important;
+}
+html[data-bubble-glass]:not([data-their-text]) .msg-theirs,
+html[data-bubble-glass]:not([data-their-text]) .msg-theirs .msg-meta {
+  color: var(--their-fg-auto, #1f2937) !important;
+}
+html.dark[data-bubble-glass]:not([data-their-text]) .msg-theirs,
+html.dark[data-bubble-glass]:not([data-their-text]) .msg-theirs .msg-meta {
+  color: var(--their-fg-auto, #f3f4f6) !important;
+}
+html[data-bubble-glass] .msg-mine .msg-meta,
+html[data-bubble-glass] .msg-theirs .msg-meta {
+  opacity: 0.75;
+}

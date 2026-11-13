@@ -1,16 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, User as UserIcon, Palette, Bell, RefreshCw, Shield, Sun, Moon } from 'lucide-react';
+import { X, User as UserIcon, Palette, Bell, RefreshCw, Shield, Sun, Moon, Monitor } from 'lucide-react';
 import SetupProfile from './SetupProfile';
 import AdminPanel from './AdminPanel';
 import { NotificationSettings } from './NotificationSettings';
 import { AppearanceSettings } from './AppearanceSettings';
 import { UpdateSettings } from './UpdateSettings';
 import { BannerSettings } from './BannerSettings';
+import { AppSettings } from './AppSettings';
 import { useUpdater } from '../hooks/useUpdater';
 import { cn } from '../lib/utils';
 
-type TabId = 'profile' | 'appearance' | 'notifications' | 'updates' | 'admin';
+type TabId = 'profile' | 'appearance' | 'notifications' | 'updates' | 'app' | 'admin';
 type ThemeId = 'light' | 'dark' | 'ocean';
 
 interface SettingsPanelProps {
@@ -47,6 +48,7 @@ export default function SettingsPanel({ theme, setTheme, isAdmin, onClose, onOpe
     { id: 'appearance', label: 'Внешний вид', icon: Palette },
     { id: 'notifications', label: 'Уведомления', icon: Bell },
     { id: 'updates', label: 'Обновления', icon: RefreshCw },
+    ...(typeof window !== 'undefined' && window.mixApp ? [{ id: 'app' as TabId, label: 'Приложение', icon: Monitor }] : []),
     ...(isAdmin ? [{ id: 'admin' as TabId, label: 'Админ-панель', icon: Shield }] : []),
   ];
 
@@ -193,6 +195,8 @@ export default function SettingsPanel({ theme, setTheme, isAdmin, onClose, onOpe
               {tab === 'updates' && (
                 <UpdateSettings updater={updater} onOpenChangelog={onOpenChangelog} />
               )}
+
+              {tab === 'app' && <AppSettings />}
 
               {tab === 'admin' && isAdmin && <AdminPanel />}
             </motion.div>

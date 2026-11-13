@@ -14,6 +14,10 @@ export interface AppearanceSettings {
   myText: string | null;
   theirBubble: string | null;
   theirText: string | null;
+  // Оформление сообщений Liquid Glass (стеклянные пузыри)
+  bubbleGlass: boolean;
+  bubbleGlassOpacity: number; // %
+  bubbleGlassBlur: number; // px
   // Фон чата
   bgMode: BgMode;
   bgColor: string;
@@ -44,6 +48,9 @@ export const DEFAULT_APPEARANCE: AppearanceSettings = {
   myText: null,
   theirBubble: null,
   theirText: null,
+  bubbleGlass: false,
+  bubbleGlassOpacity: 70,
+  bubbleGlassBlur: 14,
   bgMode: 'default',
   bgColor: '#0f172a',
   bgColor2: '#3b0764',
@@ -87,6 +94,9 @@ function sanitize(raw: any): AppearanceSettings {
     myText: hexOrNull(r.myText),
     theirBubble: hexOrNull(r.theirBubble),
     theirText: hexOrNull(r.theirText),
+    bubbleGlass: r.bubbleGlass === true,
+    bubbleGlassOpacity: clamp(r.bubbleGlassOpacity, 20, 95, d.bubbleGlassOpacity),
+    bubbleGlassBlur: clamp(r.bubbleGlassBlur, 0, 40, d.bubbleGlassBlur),
     bgMode: ['default', 'color', 'gradient', 'image'].includes(r.bgMode) ? r.bgMode : d.bgMode,
     bgColor: hexOr(r.bgColor, d.bgColor),
     bgColor2: hexOr(r.bgColor2, d.bgColor2),
@@ -147,6 +157,27 @@ function apply() {
   bubble('data-my-text', '--my-text', s.myText);
   bubble('data-their-bubble', '--their-bubble', s.theirBubble);
   bubble('data-their-text', '--their-text', s.theirText);
+
+  // Liquid Glass для сообщений: прозрачность, размытие и цвет текста по яркости выбранного цвета пузыря
+  const glassVars = ['--bubble-a1', '--bubble-a2', '--bubble-blur', '--my-fg-auto', '--their-fg-auto'];
+  if (s.bubbleGlass) {
+    root.setAttribute('data-bubble-glass', '');
+    root.style.setProperty('--bubble-a1', `${s.bubbleGlassOpacity}%`);
+    root.style.setProperty('--bubble-a2', `${Math.round(s.bubbleGlassOpacity * 0.62)}%`);
+    root.style.setProperty('--bubble-blur', `${s.bubbleGlassBlur}px`);
+    const fgFor = (hex: string) => {
+      const n = parseInt(hex.slice(1), 16);
+      const lum = (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
+      return lum > 0.6 ? '#1f2937' : '#f9fafb';
+    };
+    if (s.myBubble) root.style.setProperty('--my-fg-auto', fgFor(s.myBubble));
+    else root.style.removeProperty('--my-fg-auto');
+    if (s.theirBubble) root.style.setProperty('--their-fg-auto', fgFor(s.theirBubble));
+    else root.style.removeProperty('--their-fg-auto');
+  } else {
+    root.removeAttribute('data-bubble-glass');
+    for (const v of glassVars) root.style.removeProperty(v);
+  }
 
   // Фон чата
   let bgColor: string | null = null;
@@ -271,7 +302,7 @@ export const appearance = {
     const d = DEFAULT_APPEARANCE;
     let next = { ...state };
     if (section === 'messages' || section === 'all') {
-      next = { ...next, myBubble: null, myText: null, theirBubble: null, theirText: null };
+      next = { ...next, myBubble: null, myText: null, theirBubble: null, theirText: null, bubbleGlass: false, bubbleGlassOpacity: d.bubbleGlassOpacity, bubbleGlassBlur: d.bubbleGlassBlur };
     }
     if (section === 'background' || section === 'all') {
       setBgUrl(null);

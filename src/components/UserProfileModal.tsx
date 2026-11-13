@@ -8,6 +8,8 @@ import { Avatar } from './Avatar';
 import { UserStatus } from './UserStatus';
 import { UserName } from './UserName';
 import { ProfileBanner } from './ProfileBanner';
+import { useBanner } from '../hooks/useBanner';
+import { cn } from '../lib/utils';
 
 interface UserProfileModalProps {
   user: UserProfile;
@@ -15,6 +17,7 @@ interface UserProfileModalProps {
 }
 
 export default function UserProfileModal({ user, onClose }: UserProfileModalProps) {
+  const banner = useBanner(user.uid); // с баннером серую заглушку не показываем: баннер сам растворяется в фон карточки
   return (
     <>
       <motion.div 
@@ -30,8 +33,8 @@ export default function UserProfileModal({ user, onClose }: UserProfileModalProp
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm bg-white dark:bg-[#1a1a1a] rounded-[32px] shadow-2xl z-[201] overflow-hidden border border-[#e5e5e0] dark:border-[#333]"
       >
-        <div className="relative h-48 bg-gradient-to-br from-[#e5e5e0] to-gray-100 dark:from-[#222] dark:to-[#111]">
-          <ProfileBanner uid={user.uid} />
+        <div className={cn("relative h-48", !banner && "bg-gradient-to-br from-[#e5e5e0] to-gray-100 dark:from-[#222] dark:to-[#111]")}>
+          <ProfileBanner uid={user.uid} ambient fade />
           <button 
             onClick={onClose}
             className="absolute top-4 right-4 p-2 bg-black/10 dark:bg-black/30 hover:bg-black/20 dark:hover:bg-black/50 rounded-full text-white backdrop-blur-md transition-colors"
@@ -46,7 +49,7 @@ export default function UserProfileModal({ user, onClose }: UserProfileModalProp
           </div>
         </div>
 
-        <div className="px-6 pt-16 pb-8">
+        <div className="relative z-10 px-6 pt-16 pb-8">
           <h2 className="text-2xl font-serif text-[#1a1a1a] dark:text-white leading-tight">
             <UserName user={user} />
           </h2>

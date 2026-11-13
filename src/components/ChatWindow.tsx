@@ -4,7 +4,7 @@ import { chatService } from '../services/chatService';
 import { fileTransferService } from '../services/fileTransferService';
 import { Chat, Message, UserProfile, ReplyRef } from '../types';
 import { MessageContextMenu, ContextMenuItem } from './ContextMenu';
-import { Send, Smile, Paperclip, MoreVertical, MessageSquare, Trash2, ChevronLeft, Mic, X, Image as ImageIcon, File as FileIcon, Loader2, Video, Cloud, Share2, Users, Info, UserPlus, UploadCloud, Reply, MoreHorizontal, Copy } from 'lucide-react';
+import { Send, Smile, Paperclip, MoreVertical, MessageSquare, Trash2, ChevronLeft, Mic, X, Image as ImageIcon, File as FileIcon, Loader2, Video, Cloud, Share2, Users, Info, UserPlus, UploadCloud, Reply, MoreHorizontal, Copy, Pencil } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, getUserDisplayName, formatLastSeen, generateThumbnail, isUserOnline } from '../lib/utils';
 import { UserName } from './UserName';
@@ -26,6 +26,9 @@ interface ChatWindowProps {
   onClose?: () => void;
 }
 
+// Сообщение можно изменить в течение 10 минут после отправки (то же ограничение стоит в правилах Firestore)
+const EDIT_WINDOW_MS = 10 * 60 * 1000;
+
 export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
   const { user, profile } = useAuth();
   const [currentChat, setCurrentChat] = useState<Chat | null>(null);
@@ -45,6 +48,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [replyingTo, setReplyingTo] = useState<ReplyRef | null>(null);
+  const [editing, setEditing] = useState<{ id: string; original: string } | null>(null);
 
   // В другом чате ответ не переносим
   useEffect(() => {
@@ -174,7 +178,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value);
     
-    if (user && chatId) {
+    if (user && chatId && !editing) {
       // «Печатает» пишем в Firestore один раз, а не на каждую клавишу (экономит дневной лимит записей).
       // Повтор раз в 5 секунд, пока человек печатает: собеседник считает признак свежим 10 секунд.
       const now = Date.now();
@@ -201,6 +205,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
 
   useEffect(() => {
     setCtxMenu(null);
+    setEditing(null);
   }, [chatId]);
 
   const copyText = async (text: string) => {
@@ -222,6 +227,25 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
     }
   };
 
+  // Изменить можно только свой текст и только в течение 10 минут после отправки
+  const canEdit = (msg: Message): boolean => {
+    if (msg.senderId !== user?.uid || msg.type !== 'text' || !msg.text) return false;
+    const sentAt = msg.timestamp?.toMillis ? msg.timestamp.toMillis() : null;
+    return sentAt !== null && Date.now() - sentAt < EDIT_WINDOW_MS;
+  };
+
+  const startEdit = (msg: Message) => {
+    setReplyingTo(null);
+    setEditing({ id: msg.id, original: msg.text || '' });
+    setInput(msg.text || '');
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  const cancelEdit = () => {
+    setEditing(null);
+    setInput('');
+  };
+
   const menuItemsFor = (msg: Message): ContextMenuItem[] => {
     const items: ContextMenuItem[] = [
       { id: 'reply', label: 'Ответить', icon: <Reply className="w-4 h-4" />, onClick: () => startReply(msg) },
@@ -235,6 +259,9 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
         icon: <Copy className="w-4 h-4" />,
         onClick: () => void copyText(copyable),
       });
+    }
+    if (canEdit(msg)) {
+      items.push({ id: 'edit', label: 'Изменить', icon: <Pencil className="w-4 h-4" />, onClick: () => startEdit(msg) });
     }
     if (msg.senderId === user?.uid) {
       items.push({
@@ -304,6 +331,30 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
     if (!input.trim() || !user) return;
 
     const text = input.trim();
+
+    // Режим правки: отправляем изменение, а не новое сообщение
+    if (editing) {
+      const target = editing;
+      if (text === target.original.trim()) {
+        cancelEdit();
+        return;
+      }
+      const original = messages.find((m) => m.id === target.id);
+      if (original && !canEdit(original)) {
+        setUploadError('Время редактирования истекло: сообщение можно изменить в течение 10 минут');
+        cancelEdit();
+        return;
+      }
+      setEditing(null);
+      setInput('');
+      try {
+        await chatService.editMessage(chatId, target.id, text, messages[messages.length - 1]?.id === target.id);
+      } catch (err: any) {
+        setUploadError(err?.message || 'Не удалось изменить сообщение');
+      }
+      return;
+    }
+
     const reply = replyingTo;
     setInput('');
     setReplyingTo(null);
@@ -769,7 +820,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
       </AnimatePresence>
 
       {/* Messages */}
-      <div className={cn("chat-surface flex-1 overflow-y-auto flex flex-col px-4 pt-24 space-y-4 bg-[#fafafa] dark:bg-[#080808] custom-scrollbar", replyingTo ? "pb-44" : "pb-28")}>
+      <div className={cn("chat-surface flex-1 overflow-y-auto flex flex-col px-4 pt-24 space-y-4 bg-[#fafafa] dark:bg-[#080808] custom-scrollbar", (replyingTo || editing) ? "pb-44" : "pb-28")}>
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-gray-300 dark:text-gray-700 gap-4">
             <div className="w-20 h-20 rounded-full bg-gray-50 dark:bg-[#111] flex items-center justify-center border border-gray-100 dark:border-[#222] shadow-inner">
@@ -868,12 +919,13 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                     <span className="whitespace-pre-wrap break-words">{msg.text}</span>
                   )}
                   {/* Пустое место под время: если в последней строке текста нет места, время уходит на новую строку */}
-                  {inlineMeta && <span aria-hidden="true" className={cn("inline-block h-0 select-none", isMe ? "w-14" : "w-10")} />}
+                  {inlineMeta && <span aria-hidden="true" className={cn("inline-block h-0 select-none", isMe ? (msg.editedAt ? "w-[88px]" : "w-14") : (msg.editedAt ? "w-[72px]" : "w-10"))} />}
                   <div className={cn(
                     "msg-meta select-none flex flex-row items-center text-[10px] font-sans leading-none gap-1",
                     inlineMeta ? "absolute bottom-[7px] right-3.5" : "justify-end mt-1 text-right",
                     isMe ? "text-white/80 dark:text-black/80" : "text-gray-400 dark:text-gray-500"
                   )}>
+                    {msg.editedAt && <span title="Сообщение изменено">изм.</span>}
                     <span>{msg.timestamp && format(msg.timestamp.toDate(), 'HH:mm', { locale: ru })}</span>
                     {isMe && (
                       <MessageStatusIndicator
@@ -938,6 +990,25 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                 className="h-full bg-blue-500"
               />
             </div>
+          </div>
+        )}
+
+        {editing && !isRecording && (
+          <div className="relative isolate flex items-center gap-3 mb-2 pl-4 pr-2 py-2 rounded-[22px]">
+            <div aria-hidden="true" className="glass-bar absolute inset-0 -z-10 rounded-[22px] pointer-events-none" />
+            <Pencil className="w-4 h-4 text-blue-500 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-blue-500 truncate">Редактирование сообщения</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{editing.original}</p>
+            </div>
+            <button
+              type="button"
+              onClick={cancelEdit}
+              aria-label="Отменить редактирование"
+              className="p-1.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 text-gray-400 shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         )}
 
@@ -1009,8 +1080,9 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
               onChange={handleInputChange}
               onPaste={handlePaste}
               onKeyDown={(e) => {
-                if (e.key === 'Escape' && replyingTo) {
-                  setReplyingTo(null);
+                if (e.key === 'Escape' && (replyingTo || editing)) {
+                  if (editing) cancelEdit();
+                  else setReplyingTo(null);
                   return;
                 }
                 if (e.key === 'Enter' && !e.shiftKey) {

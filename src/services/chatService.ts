@@ -227,6 +227,27 @@ export const chatService = {
   },
 
   // Mark messages as read by current user
+  // Изменение текста своего сообщения. Сервер разрешает это только автору и только в течение 10 минут.
+  editMessage: async (chatId: string, messageId: string, newText: string, isLastMessage: boolean) => {
+    const text = newText.trim();
+    if (!text) throw new Error('Сообщение не может быть пустым');
+    if (text.length > 5000) throw new Error('Сообщение длиннее 5000 символов');
+    try {
+      await updateDoc(doc(db, 'chats', chatId, 'messages', messageId), { text, editedAt: serverTimestamp() });
+    } catch (error) {
+      console.warn('Message edit failed', error);
+      throw new Error('Не удалось изменить сообщение. Возможно, прошло больше 10 минут');
+    }
+    if (isLastMessage) {
+      // Подпись в списке чатов обновляем, только если изменили последнее сообщение
+      try {
+        await updateDoc(doc(db, 'chats', chatId), { lastMessage: text, updatedAt: serverTimestamp() });
+      } catch (e) {
+        console.warn('Could not update chat lastMessage after edit:', e);
+      }
+    }
+  },
+
   markMessagesAsRead: async (chatId: string, currentUserId: string, messages: Message[]) => {
     try {
       const unreadMessages = messages.filter(
