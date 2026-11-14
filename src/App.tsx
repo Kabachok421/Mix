@@ -160,7 +160,7 @@ export default function App() {
     <div className="fixed inset-0 flex bg-[#f5f5f0] dark:bg-[#050505] overflow-hidden p-0 sm:p-4 transition-colors duration-500 font-sans">
       <CallManager />
       <InAppNotificationToast onOpenChat={(chatId) => setActiveChatId(chatId)} />
-      <div className="flex-1 flex max-w-6xl mx-auto w-full bg-white dark:bg-[#111111] sm:rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.6)] overflow-hidden border border-[#e5e5e0] dark:border-[#222] transition-colors relative">
+      <div className="flex-1 min-w-0 flex max-w-6xl mx-auto w-full bg-white dark:bg-[#111111] sm:rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.6)] overflow-hidden border border-[#e5e5e0] dark:border-[#222] transition-colors relative">
         
         {/* Sidebar */}
         <aside className={cn(
@@ -231,7 +231,7 @@ export default function App() {
 
         {/* Main Content */}
         <main className={cn(
-          "flex-1 flex-col h-full bg-[#fafafa] dark:bg-[#0d0d0d]",
+          "flex-1 min-w-0 flex-col h-full bg-[#fafafa] dark:bg-[#0d0d0d]",
           activeChatId ? "flex" : "hidden sm:flex"
         )}>
           {activeChatId ? (

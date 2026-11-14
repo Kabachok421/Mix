@@ -585,7 +585,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
 
   return (
     <div 
-      className="flex-1 flex flex-col bg-white dark:bg-[#0d0d0d] overflow-hidden transition-colors duration-500 relative"
+      className="flex-1 min-w-0 flex flex-col bg-white dark:bg-[#0d0d0d] overflow-hidden transition-colors duration-500 relative"
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -826,7 +826,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
       </AnimatePresence>
 
       {/* Messages */}
-      <div className={cn("chat-surface flex-1 overflow-y-auto flex flex-col px-4 pt-24 space-y-4 bg-[#fafafa] dark:bg-[#080808] custom-scrollbar", "pb-28")}
+      <div className={cn("chat-surface flex-1 min-w-0 overflow-y-auto overflow-x-hidden flex flex-col px-3 sm:px-4 pt-24 space-y-4 bg-[#fafafa] dark:bg-[#080808] custom-scrollbar", "pb-28")}
             style={{ paddingBottom: 112 + ((replyingTo || editing) ? 64 : 0) + ((linkPreview.embed || linkPreview.loading) ? (linkPreview.embed?.image ? 168 : 112) : 0) }}>
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-gray-300 dark:text-gray-700 gap-4">
@@ -863,7 +863,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                 key={msg.id}
                 id={`msg-${msg.id}`}
                 className={cn(
-                  "group/msg flex flex-col max-w-[80%] gap-1",
+                  "group/msg flex flex-col min-w-0 max-w-[85%] sm:max-w-[80%] gap-1",
                   isMe ? "self-end items-end" : "self-start items-start"
                 )}
               >
@@ -892,7 +892,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                   onTouchEnd={cancelLongPress}
                   onTouchCancel={cancelLongPress}
                   className={cn(
-                    "px-3.5 py-2 rounded-2xl shadow-sm text-sm leading-snug relative transition-all duration-300",
+                    "px-3.5 py-2 rounded-2xl shadow-sm text-sm leading-snug relative min-w-0 max-w-full transition-all duration-300",
                     isMe 
                       ? "msg-mine bg-[#1a1a1a] dark:bg-[#e5e5e0] text-white dark:text-black rounded-tr-none shadow-md" 
                       : "msg-theirs bg-white dark:bg-[#1e1e1e] border border-gray-100 dark:border-[#333] text-gray-800 dark:text-gray-200 rounded-tl-none shadow-sm",
@@ -924,7 +924,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                       <FileMessage type={msg.type} url={msg.url === 'p2p-sent' ? p2pFiles[msg.fileName || ''] : msg.url!} thumbnail={msg.thumbnail} fileName={msg.fileName} fileSize={msg.fileSize} isMe={isMe} />
                     )
                   ) : (
-                    <span className="whitespace-pre-wrap break-words"><LinkifiedText text={msg.text || ''} /></span>
+                    <span className="whitespace-pre-wrap [overflow-wrap:anywhere]"><LinkifiedText text={msg.text || ''} /></span>
                   )}
                   {embed && <LinkEmbedCard embed={embed} className="mt-2" />}
                   {/* Пустое место под время: если в последней строке текста нет места, время уходит на новую строку */}
@@ -964,7 +964,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
       </div>
 
       {/* Input */}
-      <div className="absolute bottom-0 left-0 right-0 z-20 p-3">
+      <div className="absolute bottom-0 left-0 right-0 z-20 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {uploadError && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -1106,7 +1106,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                 }
               }}
               placeholder="Напишите сообщение..."
-              className="flex-1 bg-transparent border-none outline-none text-sm py-2 dark:text-white"
+              className="flex-1 min-w-0 w-full bg-transparent border-none outline-none text-base sm:text-sm py-2 dark:text-white"
             />
             <div className="relative flex items-center">
               <button 
