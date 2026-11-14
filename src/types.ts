@@ -1,4 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
+import type { LinkEmbed } from './lib/linkUtils';
 
 export interface UserProfile {
   uid: string;
@@ -66,6 +67,7 @@ export interface Message {
   duration?: number; // for voice
   replyTo?: ReplyRef;
   editedAt?: Timestamp; // когда сообщение изменили (есть только у изменённых)
+  embed?: LinkEmbed; // вложение-превью первой ссылки (как в Discord)
   // Message delivery and read status indicators
   readBy?: string[];
   deliveredTo?: string[];

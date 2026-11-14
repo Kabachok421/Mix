@@ -158,6 +158,17 @@ function apply() {
   bubble('data-their-bubble', '--their-bubble', s.theirBubble);
   bubble('data-their-text', '--their-text', s.theirText);
 
+  // Оттенок ссылок на своём цвете пузыря: тёмный пузырь -> светло-синяя ссылка, светлый -> тёмно-синяя
+  const linkFor = (hex: string) => {
+    const n = parseInt(hex.slice(1), 16);
+    const lum = (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
+    return lum > 0.6 ? '#1d4ed8' : '#8ab4ff';
+  };
+  if (s.myBubble) root.style.setProperty('--my-link', linkFor(s.myBubble));
+  else root.style.removeProperty('--my-link');
+  if (s.theirBubble) root.style.setProperty('--their-link', linkFor(s.theirBubble));
+  else root.style.removeProperty('--their-link');
+
   // Liquid Glass для сообщений: прозрачность, размытие и цвет текста по яркости выбранного цвета пузыря
   const glassVars = ['--bubble-a1', '--bubble-a2', '--bubble-blur', '--my-fg-auto', '--their-fg-auto'];
   if (s.bubbleGlass) {

@@ -18,4 +18,6 @@ contextBridge.exposeInMainWorld('mixUpdater', {
 contextBridge.exposeInMainWorld('mixApp', {
   getAutostart: () => ipcRenderer.invoke('app:get-autostart'),
   setAutostart: (enabled) => ipcRenderer.invoke('app:set-autostart', enabled === true),
+  // Превью ссылки для вложения в сообщении (страницу загружает приложение, а не окно чата)
+  fetchLinkPreview: (url) => ipcRenderer.invoke('link:preview', String(url)),
 });

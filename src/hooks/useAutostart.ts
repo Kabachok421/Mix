@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import type { LinkEmbed } from '../lib/linkUtils';
 
 // Запуск вместе с Windows. Мост window.mixApp есть только в приложении Mix для Windows (его создаёт preload),
 // в браузере supported = false и раздел настроек скрыт.
@@ -7,6 +8,7 @@ declare global {
     mixApp?: {
       getAutostart(): Promise<boolean | null>;
       setAutostart(enabled: boolean): Promise<boolean | null>;
+      fetchLinkPreview?(url: string): Promise<LinkEmbed | null>;
     };
   }
 }

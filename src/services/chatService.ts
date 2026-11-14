@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth, handleFirestoreError } from '../lib/firebase';
 import { Chat, Message, UserProfile, ChangelogItem } from '../types';
+import { sanitizeEmbed } from '../lib/linkUtils';
 
 export const chatService = {
   // Get active chats for current user
@@ -191,6 +192,8 @@ export const chatService = {
       if (data.fileName) messageData.fileName = data.fileName;
       if (data.fileSize) messageData.fileSize = data.fileSize;
       if (data.duration) messageData.duration = data.duration;
+      const embed = sanitizeEmbed(data.embed);
+      if (embed) messageData.embed = embed;
       if (data.replyTo) {
         messageData.replyTo = {
           id: String(data.replyTo.id).slice(0, 128),

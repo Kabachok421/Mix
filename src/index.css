@@ -312,3 +312,45 @@ html[data-bubble-glass] .msg-mine .msg-meta,
 html[data-bubble-glass] .msg-theirs .msg-meta {
   opacity: 0.75;
 }
+
+/* ===== Ссылки в сообщениях и вложения-превью ===== */
+.msg-link {
+  color: #2563eb;
+  text-decoration: none;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.msg-link:hover {
+  text-decoration: underline;
+}
+.dark .msg-link {
+  color: #7cb0ff;
+}
+/* Тёмный свой пузырь в светлой теме и светлый в тёмной: ссылка контрастного оттенка */
+html:not(.dark) .msg-mine .msg-link {
+  color: #8ab4ff;
+}
+html.dark .msg-mine .msg-link {
+  color: #1d4ed8;
+}
+/* Свой цвет пузыря из настроек: оттенок ссылки считается по яркости этого цвета */
+html[data-my-bubble] .msg-mine .msg-link {
+  color: var(--my-link);
+}
+html[data-their-bubble] .msg-theirs .msg-link {
+  color: var(--their-link);
+}
+
+/* Карточка вложения над полем ввода: полупрозрачное стекло, читается поверх сообщений */
+.embed-compose {
+  color: #1f2937;
+  background: rgba(255, 255, 255, 0.8) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  backdrop-filter: blur(18px) saturate(170%);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+html.dark .embed-compose {
+  color: #f3f4f6;
+  background: rgba(32, 32, 42, 0.74) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}

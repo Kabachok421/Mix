@@ -5,6 +5,7 @@ const fs = require('fs');
 const { startServer } = require('./server.cjs');
 const { initUpdater } = require('./updater.cjs');
 const { initAppSettings } = require('./appSettings.cjs');
+const { initLinkPreview } = require('./linkPreview.cjs');
 
 const APP_ID = 'com.m3lts.mix';
 const PREFERRED_PORT = 47831; // фиксированный порт: у входа Firebase и у IndexedDB origin один и тот же
@@ -271,6 +272,7 @@ async function boot() {
     },
   });
   initAppSettings({ getWindow: () => mainWindow });
+  initLinkPreview({ getWindow: () => mainWindow });
   createTray();
   if (fellBack) {
     dialog.showMessageBox({

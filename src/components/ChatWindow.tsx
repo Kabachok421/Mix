@@ -4,6 +4,10 @@ import { chatService } from '../services/chatService';
 import { fileTransferService } from '../services/fileTransferService';
 import { Chat, Message, UserProfile, ReplyRef } from '../types';
 import { MessageContextMenu, ContextMenuItem } from './ContextMenu';
+import { LinkifiedText } from './LinkifiedText';
+import { LinkEmbedCard } from './LinkEmbedCard';
+import { useLinkPreview } from '../hooks/useLinkPreview';
+import { sanitizeEmbed } from '../lib/linkUtils';
 import { Send, Smile, Paperclip, MoreVertical, MessageSquare, Trash2, ChevronLeft, Mic, X, Image as ImageIcon, File as FileIcon, Loader2, Video, Cloud, Share2, Users, Info, UserPlus, UploadCloud, Reply, MoreHorizontal, Copy, Pencil } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, getUserDisplayName, formatLastSeen, generateThumbnail, isUserOnline } from '../lib/utils';
@@ -49,6 +53,8 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [replyingTo, setReplyingTo] = useState<ReplyRef | null>(null);
   const [editing, setEditing] = useState<{ id: string; original: string } | null>(null);
+  // Вложение для первой ссылки в вводимом тексте (до отправки его можно открепить)
+  const linkPreview = useLinkPreview(input, !editing);
 
   // В другом чате ответ не переносим
   useEffect(() => {
@@ -366,7 +372,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
       chatService.setTypingStatus(chatId, user.uid, false);
     }
 
-    await chatService.sendMessage(chatId, user.uid, getUserDisplayName(profile as UserProfile) || user.displayName || 'Anonymous', { text, type: 'text', replyTo: reply || undefined });
+    await chatService.sendMessage(chatId, user.uid, getUserDisplayName(profile as UserProfile) || user.displayName || 'Anonymous', { text, type: 'text', replyTo: reply || undefined, embed: linkPreview.embed || undefined });
   };
 
   const uploadSelectedFile = async (file: File, type: 'image' | 'file') => {
@@ -820,7 +826,8 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
       </AnimatePresence>
 
       {/* Messages */}
-      <div className={cn("chat-surface flex-1 overflow-y-auto flex flex-col px-4 pt-24 space-y-4 bg-[#fafafa] dark:bg-[#080808] custom-scrollbar", (replyingTo || editing) ? "pb-44" : "pb-28")}>
+      <div className={cn("chat-surface flex-1 overflow-y-auto flex flex-col px-4 pt-24 space-y-4 bg-[#fafafa] dark:bg-[#080808] custom-scrollbar", "pb-28")}
+            style={{ paddingBottom: 112 + ((replyingTo || editing) ? 64 : 0) + ((linkPreview.embed || linkPreview.loading) ? (linkPreview.embed?.image ? 168 : 112) : 0) }}>
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-gray-300 dark:text-gray-700 gap-4">
             <div className="w-20 h-20 rounded-full bg-gray-50 dark:bg-[#111] flex items-center justify-center border border-gray-100 dark:border-[#222] shadow-inner">
@@ -845,7 +852,8 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
             const senderProfile = groupMembersMap[msg.senderId];
             const senderDisplayName = senderProfile?.customName || senderProfile?.displayName || msg.senderName;
             // У текста время стоит в углу рядом с последней строкой, у файлов, фото и голосовых под содержимым
-            const inlineMeta = msg.type !== 'voice' && msg.type !== 'image' && msg.type !== 'file';
+            const embed = sanitizeEmbed(msg.embed);
+            const inlineMeta = msg.type !== 'voice' && msg.type !== 'image' && msg.type !== 'file' && !embed;
 
             return (
               <motion.div
@@ -916,8 +924,9 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                       <FileMessage type={msg.type} url={msg.url === 'p2p-sent' ? p2pFiles[msg.fileName || ''] : msg.url!} thumbnail={msg.thumbnail} fileName={msg.fileName} fileSize={msg.fileSize} isMe={isMe} />
                     )
                   ) : (
-                    <span className="whitespace-pre-wrap break-words">{msg.text}</span>
+                    <span className="whitespace-pre-wrap break-words"><LinkifiedText text={msg.text || ''} /></span>
                   )}
+                  {embed && <LinkEmbedCard embed={embed} className="mt-2" />}
                   {/* Пустое место под время: если в последней строке текста нет места, время уходит на новую строку */}
                   {inlineMeta && <span aria-hidden="true" className={cn("inline-block h-0 select-none", isMe ? (msg.editedAt ? "w-[88px]" : "w-14") : (msg.editedAt ? "w-[72px]" : "w-10"))} />}
                   <div className={cn(
@@ -990,6 +999,12 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                 className="h-full bg-blue-500"
               />
             </div>
+          </div>
+        )}
+
+        {(linkPreview.embed || linkPreview.loading) && !isRecording && !editing && (
+          <div className="mb-2 flex justify-start">
+            <LinkEmbedCard embed={linkPreview.embed} loading={linkPreview.loading} onDismiss={linkPreview.dismiss} className="embed-compose" />
           </div>
         )}
 
