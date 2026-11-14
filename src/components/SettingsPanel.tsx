@@ -20,6 +20,7 @@ interface SettingsPanelProps {
   isAdmin: boolean;
   onClose: () => void;
   onOpenChangelog: () => void;
+  initialTab?: 'profile' | 'appearance' | 'notifications';
 }
 
 // Направление смены раздела задаёт, с какой стороны выезжает новое содержимое
@@ -35,11 +36,11 @@ const THEMES: { id: ThemeId; label: string }[] = [
   { id: 'ocean', label: 'Ocean' },
 ];
 
-export default function SettingsPanel({ theme, setTheme, isAdmin, onClose, onOpenChangelog }: SettingsPanelProps) {
+export default function SettingsPanel({ theme, setTheme, isAdmin, onClose, onOpenChangelog, initialTab }: SettingsPanelProps) {
   const updater = useUpdater();
   // В приложении: номер установленной версии. В браузере номера нет, остаётся только «Что нового».
   const versionLabel = updater.supported && updater.state?.currentVersion ? `Mix ${updater.state.currentVersion}` : 'Что нового';
-  const [tab, setTab] = useState<TabId>('profile');
+  const [tab, setTab] = useState<TabId>(initialTab ?? 'profile');
   const [dir, setDir] = useState(1);
   const scrollRef = useRef<HTMLDivElement>(null);
 

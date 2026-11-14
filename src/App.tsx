@@ -19,6 +19,7 @@ import { UserName } from './components/UserName';
 import { InAppNotificationToast } from './components/InAppNotificationToast';
 import { NotificationSettings } from './components/NotificationSettings';
 import SettingsPanel from './components/SettingsPanel';
+import { MiniProfile, MiniProfileTab } from './components/MiniProfile';
 import { useUpdater } from './hooks/useUpdater';
 import { notificationService } from './services/notificationService';
 import { chatService } from './services/chatService';
@@ -34,6 +35,13 @@ export default function App() {
   const installedVersionLabel = updater.state?.currentVersion ? `Mix ${updater.state.currentVersion}` : undefined;
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<MiniProfileTab | undefined>(undefined);
+  const [showMiniProfile, setShowMiniProfile] = useState(false);
+  const profileBarRef = useRef<HTMLDivElement>(null);
+  const openSettings = (tab?: MiniProfileTab) => {
+    setSettingsTab(tab);
+    setShowSettings(true);
+  };
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState<'profile' | 'admin'>('profile');
   const [showChangelog, setShowChangelog] = useState(false);
@@ -178,7 +186,7 @@ export default function App() {
                 <Users className="w-5 h-5" />
               </button>
                <button 
-                  onClick={() => setShowSettings(true)}
+                  onClick={() => openSettings()}
                   className="relative p-2 hover:bg-gray-100 dark:hover:bg-[#222] rounded-full transition-colors text-gray-500 dark:text-gray-400 active:scale-95"
                   title={updateReady ? 'Настройки: есть обновление' : 'Настройки'}
                >
@@ -206,8 +214,12 @@ export default function App() {
           {/* Profile Bar */}
           <div className="p-4 bg-gray-50/50 dark:bg-[#181818]/50 border-t border-gray-100 dark:border-[#222] mt-auto flex items-center justify-between">
             <div 
-              className="flex items-center gap-3 cursor-pointer group"
-              onClick={() => setShowSettings(true)}
+              ref={profileBarRef}
+              className="flex items-center gap-3 cursor-pointer group min-w-0 flex-1"
+              onClick={() => setShowMiniProfile((v) => !v)}
+              role="button"
+              aria-haspopup="dialog"
+              aria-expanded={showMiniProfile}
             >
               <Avatar 
                 src={profile?.photoURL} 
@@ -283,9 +295,23 @@ export default function App() {
                 isAdmin={isAdmin}
                 onClose={() => setShowSettings(false)}
                 onOpenChangelog={() => setShowChangelog(true)}
+                initialTab={settingsTab}
               />
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showMiniProfile && profileBarRef.current && (
+          <MiniProfile
+            anchor={profileBarRef.current}
+            profile={profile}
+            fallbackName={user.displayName}
+            onClose={() => setShowMiniProfile(false)}
+            onOpenSettings={openSettings}
+            onLogout={logout}
+          />
         )}
       </AnimatePresence>
 
