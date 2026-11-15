@@ -121,7 +121,7 @@ export function MiniProfile({
       animate={pos ? { opacity: 1, scale: 1, y: 0 } : { opacity: 0, scale: 0.9, y: 10 }}
       exit={{ opacity: 0, scale: 0.95, y: 6, transition: { duration: 0.12 } }}
       transition={{ type: 'spring', stiffness: 460, damping: 30 }}
-      className="glass-panel isolate fixed z-[250] rounded-[28px] overflow-hidden"
+      className="glass-panel isolate fixed z-[250] rounded-[28px] overflow-hidden text-gray-900 dark:text-gray-100"
       style={{
         left: pos?.left ?? 8,
         bottom: pos?.bottom ?? 8,
