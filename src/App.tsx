@@ -212,10 +212,14 @@ export default function App() {
           />
 
           {/* Profile Bar */}
-          <div className="p-4 bg-gray-50/50 dark:bg-[#181818]/50 border-t border-gray-100 dark:border-[#222] mt-auto flex items-center justify-between">
+          <div className="p-3 bg-gray-50/50 dark:bg-[#181818]/50 border-t border-gray-100 dark:border-[#222] mt-auto">
             <div 
               ref={profileBarRef}
-              className="flex items-center gap-3 cursor-pointer group min-w-0 flex-1"
+              className={cn(
+                "flex items-center gap-3 cursor-pointer group min-w-0 w-full px-3 py-2.5 rounded-2xl border border-transparent transition-all",
+                "hover:border-gray-300 dark:hover:border-[#444] hover:bg-white dark:hover:bg-[#222] hover:shadow-sm",
+                showMiniProfile && "border-gray-300 dark:border-[#444] bg-white dark:bg-[#222] shadow-sm"
+              )}
               onClick={() => setShowMiniProfile((v) => !v)}
               role="button"
               aria-haspopup="dialog"
@@ -223,7 +227,7 @@ export default function App() {
             >
               <Avatar 
                 src={profile?.photoURL} 
-                className="w-9 h-9 border border-white dark:border-[#333] shadow-sm group-hover:opacity-80 group-hover:bg-gray-300 dark:group-hover:bg-[#444] transition-all" 
+                className="w-9 h-9 shrink-0 border border-white dark:border-[#333] shadow-sm" 
               />
               <div className="text-left overflow-hidden">
                 <p className="text-sm font-medium text-[#1a1a1a] dark:text-white truncate">
@@ -232,12 +236,6 @@ export default function App() {
                 <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate">@{profile?.username}</p>
               </div>
             </div>
-            <button 
-              onClick={logout}
-              className="p-2 hover:bg-white dark:hover:bg-[#222] hover:text-red-500 rounded-xl transition-all shadow-sm group border border-transparent hover:border-red-100 dark:hover:border-red-900/30"
-            >
-              <LogOut className="w-4 h-4 text-gray-400 group-hover:text-red-500" />
-            </button>
           </div>
         </aside>
 
