@@ -1,0 +1,38 @@
+name: Cleanup old file-sending leftovers
+
+# Разовая очистка: удаляет файлы старых способов отправки файлов (загрузка на сервер, GoFile и другие).
+# Запуск: Actions -> Cleanup old file-sending leftovers -> Run workflow. После этого сам этот файл можно удалить.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Remove old files
+        run: |
+          git rm -rf --ignore-unmatch \
+            uploads \
+            desktop/config.default.json \
+            src/services/fileTransferService.ts \
+            test_catbox.js test_fileio.js test_gofile.js test_gofile_cors.js test_tmpfiles.js \
+            test_storage.js test-storage.js test-firestore-transfer.js test_thumb.js \
+            patch_file_upload.js patch_filemessage.js patch_filemessage_img.js patch_voice_upload.js \
+            fix_p2p_only.md fix_summary.md update.md
+
+      - name: Commit
+        run: |
+          if git diff --cached --quiet; then
+            echo "Удалять нечего: всё уже очищено"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "Remove leftovers of old file-sending methods"
+            git push
+          fi
