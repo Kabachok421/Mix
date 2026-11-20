@@ -13,7 +13,7 @@ export function useVoiceRecorder() {
         throw new Error("Ваш браузер блокирует доступ к микрофону внутри iframe. Пожалуйста, откройте приложение в новой вкладке (кнопка справа вверху).");
       }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      const mediaRecorder = new MediaRecorder(stream, { audioBitsPerSecond: 24000 });
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
 

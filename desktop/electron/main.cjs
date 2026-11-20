@@ -59,15 +59,6 @@ function readJson(file) {
   }
 }
 
-// Настройки: config.default.json (внутри приложения) < %APPDATA%\Mix\config.json < переменная MIX_API_BASE
-function loadConfig() {
-  const cfg = { apiBase: '' };
-  Object.assign(cfg, readJson(path.join(app.getAppPath(), 'config.default.json')) || {});
-  Object.assign(cfg, readJson(path.join(app.getPath('userData'), 'config.json')) || {});
-  if (process.env.MIX_API_BASE) cfg.apiBase = process.env.MIX_API_BASE;
-  return cfg;
-}
-
 const stateFile = () => path.join(app.getPath('userData'), 'window-state.json');
 
 function saveState() {
@@ -103,7 +94,7 @@ function setupSession(ses) {
     .replace(/\s(?:mix-messenger|Mix)\/[\d.]+/i, '');
   ses.setUserAgent(ua);
 
-  const allowed = new Set(['media', 'audioCapture', 'videoCapture', 'notifications', 'clipboard-sanitized-write', 'fullscreen']);
+  const allowed = new Set(['media', 'audioCapture', 'videoCapture', 'notifications', 'clipboard-sanitized-write', 'fullscreen', 'fileSystem']);
   const fromApp = (url) => typeof url === 'string' && url.startsWith(localOrigin);
   ses.setPermissionRequestHandler((_wc, permission, cb, details) => cb(allowed.has(permission) && fromApp(details.requestingUrl)));
   ses.setPermissionCheckHandler((_wc, permission, origin) => allowed.has(permission) && fromApp(origin));
@@ -250,15 +241,12 @@ async function boot() {
   if (app.isPackaged) Menu.setApplicationMenu(null);
 
   initLog();
-  const cfg = loadConfig();
   const { port, fellBack } = await startServer({
     webDir: path.join(app.getAppPath(), 'web'),
-    uploadDir: path.join(app.getPath('userData'), 'uploads'),
-    apiBase: cfg.apiBase,
     port: PREFERRED_PORT,
     retryMs: 8000,
   });
-  log(`запуск Mix ${app.getVersion()}, порт ${port}${fellBack ? ' (ЗАПАСНОЙ: ' + PREFERRED_PORT + ' занят)' : ''}, apiBase="${cfg.apiBase}"`);
+  log(`запуск Mix ${app.getVersion()}, порт ${port}${fellBack ? ' (ЗАПАСНОЙ: ' + PREFERRED_PORT + ' занят)' : ''}`);
   // Именно localhost, не 127.0.0.1: домен localhost есть в разрешённых доменах Firebase Auth по умолчанию
   localOrigin = `http://localhost:${port}`;
 

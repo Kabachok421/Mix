@@ -66,6 +66,8 @@ export interface Message {
   fileSize?: number;
   duration?: number; // for voice
   replyTo?: ReplyRef;
+  mimeType?: string; // тип файла (для файлов, переданных напрямую)
+  p2p?: boolean; // файл передаётся напрямую между устройствами: в сообщении только описание
   editedAt?: Timestamp; // когда сообщение изменили (есть только у изменённых)
   embed?: LinkEmbed; // вложение-превью первой ссылки (как в Discord)
   // Message delivery and read status indicators

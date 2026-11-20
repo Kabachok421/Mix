@@ -1,7 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { chatService } from '../services/chatService';
-import { fileTransferService } from '../services/fileTransferService';
+import { p2p } from '../services/p2pFirestore';
+import { MAX_FILE_BYTES } from '../services/p2pCore';
+import { PendingAttachments, type PendingFile } from './PendingAttachments';
+import { isMediaFile } from '../lib/fileUtils';
 import { Chat, Message, UserProfile, ReplyRef } from '../types';
 import { MessageContextMenu, ContextMenuItem } from './ContextMenu';
 import { LinkifiedText } from './LinkifiedText';
@@ -49,10 +52,11 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
   const typingActiveRef = useRef(false); // «печатает» уже отправлено
   const typingSentAtRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [replyingTo, setReplyingTo] = useState<ReplyRef | null>(null);
   const [editing, setEditing] = useState<{ id: string; original: string } | null>(null);
+  // Выбранные файлы: сначала лежат над полем ввода, отправляются кнопкой, к каждому можно добавить подпись
+  const [pending, setPending] = useState<PendingFile[]>([]);
   // Вложение для первой ссылки в вводимом тексте (до отправки его можно открепить)
   const linkPreview = useLinkPreview(input, !editing);
 
@@ -61,14 +65,9 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
     setReplyingTo(null);
   }, [chatId]);
   
-  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadMethod, setUploadMethod] = useState('');
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const dragCounter = useRef(0);
-  const [p2pFiles, setP2pFiles] = useState<Record<string, string>>({});
   const { isRecording, duration, startRecording, stopRecording, cancelRecording } = useVoiceRecorder();
 
   const handleDeleteChat = async () => {
@@ -151,16 +150,6 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
     }
 
     // Subscribe to incoming P2P transfers
-    const unsubscribeTransfers = fileTransferService.subscribeToIncomingTransfers(chatId, user.uid, (transferId, meta) => {
-      fileTransferService.acceptTransfer(chatId, transferId, meta.offer, (progress) => {
-         setUploadProgress(Math.round(progress));
-         setIsUploading(true);
-      }, (url, name) => {
-         setIsUploading(false);
-         setUploadProgress(0);
-         setP2pFiles(prev => ({ ...prev, [name]: url }));
-      }).catch(console.error);
-    });
 
     return () => {
       unsubscribeMessages();
@@ -173,7 +162,6 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
         typingActiveRef.current = false;
         chatService.setTypingStatus(chatId, user.uid, false);
       }
-      unsubscribeTransfers();
     };
   }, [chatId, user]);
 
@@ -212,6 +200,10 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
   useEffect(() => {
     setCtxMenu(null);
     setEditing(null);
+    setPending((prev) => {
+      prev.forEach((p) => p.previewUrl && URL.revokeObjectURL(p.previewUrl));
+      return [];
+    });
   }, [chatId]);
 
   const copyText = async (text: string) => {
@@ -334,7 +326,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || !user) return;
+    if ((!input.trim() && pending.length === 0) || !user) return;
 
     const text = input.trim();
 
@@ -361,6 +353,12 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
       return;
     }
 
+    // Есть выбранные файлы: отправляем их (текст из поля ввода станет подписью к первому)
+    if (pending.length > 0) {
+      await sendPendingFiles(text);
+      return;
+    }
+
     const reply = replyingTo;
     setInput('');
     setReplyingTo(null);
@@ -375,86 +373,101 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
     await chatService.sendMessage(chatId, user.uid, getUserDisplayName(profile as UserProfile) || user.displayName || 'Anonymous', { text, type: 'text', replyTo: reply || undefined, embed: linkPreview.embed || undefined });
   };
 
-  const uploadSelectedFile = async (file: File, type: 'image' | 'file') => {
-    if (!file || !user) return;
+  // --- Вложения ---
+  const MAX_FILES = 10;
+  const revokePreview = (p: PendingFile) => p.previewUrl && URL.revokeObjectURL(p.previewUrl);
 
-    if (file.size > 100 * 1024 * 1024) {
-      setUploadError('Размер файла превышает 100 МБ');
-      setTimeout(() => setUploadError(null), 5000);
-      return;
+  const addFiles = (files: File[]) => {
+    if (!files.length) return;
+    const problems: string[] = [];
+    const room = MAX_FILES - pending.length;
+    const accepted: PendingFile[] = [];
+    for (const file of files) {
+      if (file.size === 0) problems.push(`${file.name}: файл пустой`);
+      else if (file.size > MAX_FILE_BYTES) problems.push(`${file.name}: больше 10 ГБ`);
+      else if (accepted.length >= room) {
+        if (!problems.some((x) => x.startsWith('Не больше'))) problems.push(`Не больше ${MAX_FILES} файлов за раз`);
+      } else {
+        accepted.push({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          file,
+          caption: '',
+          previewUrl: file.type.startsWith('image/') && file.size < 30 * 1024 * 1024 ? URL.createObjectURL(file) : null,
+        });
+      }
     }
-
-    try {
-      setIsUploading(true);
-      setUploadProgress(0);
+    if (accepted.length) setPending((prev) => [...prev, ...accepted]);
+    if (problems.length) {
+      setUploadError(problems.join('. '));
+      setTimeout(() => setUploadError(null), 6000);
+    } else {
       setUploadError(null);
-      setShowAttachmentMenu(false);
+    }
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
 
-      const isVideo = file.type.startsWith('video/') || !!file.name.match(/\.(mp4|webm|mov|ogg)$/i);
-      const isImage = file.type.startsWith('image/');
-      const effectiveType = (isImage || isVideo) ? 'image' : 'file';
+  const removePending = (id: string) =>
+    setPending((prev) => {
+      const gone = prev.find((p) => p.id === id);
+      if (gone) revokePreview(gone);
+      return prev.filter((p) => p.id !== id);
+    });
+  const clearPending = () => {
+    pending.forEach(revokePreview);
+    setPending([]);
+  };
+  const setCaption = (id: string, caption: string) => setPending((prev) => prev.map((p) => (p.id === id ? { ...p, caption } : p)));
 
-      if (!uploadMethod) {
-        setUploadMethod(isVideo ? 'Видео' : (isImage ? 'Фото' : 'Файл'));
-      }
+  const handleFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const list = Array.from(e.target.files || []);
+    e.target.value = ''; // чтобы тот же файл можно было выбрать повторно
+    addFiles(list);
+  };
 
-      const finalUrl = await chatService.uploadFile('', file, (progress) => {
-        setUploadProgress(Math.round(progress));
-      });
-
-      let thumbnail: string | undefined = undefined;
-      if (isImage) {
-        try {
-          thumbnail = await generateThumbnail(file);
-        } catch (e) {
-          console.warn('Could not generate thumbnail', e);
+  // Отправка вложений: в чат уходит описание файла (имя, размер, превью, подпись), а сам файл остаётся у вас и
+  // передаётся получателю напрямую, когда он нажмёт «Скачать»
+  const sendPendingFiles = async (mainText: string) => {
+    if (!user) return;
+    const items = pending;
+    const reply = replyingTo;
+    setPending([]);
+    setInput('');
+    setReplyingTo(null);
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    if (typingActiveRef.current) {
+      typingActiveRef.current = false;
+      chatService.setTypingStatus(chatId, user.uid, false);
+    }
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      revokePreview(it);
+      const caption = (it.caption.trim() || (i === 0 ? mainText : '')).slice(0, 1000);
+      try {
+        let thumbnail: string | undefined;
+        if (it.file.type.startsWith('image/')) {
+          try {
+            thumbnail = await generateThumbnail(it.file, 360, 360);
+          } catch {
+            thumbnail = undefined; // без превью
+          }
         }
-      }
-
-      await chatService.sendMessage(
-        chatId, 
-        user.uid, 
-        getUserDisplayName(profile as UserProfile) || user.displayName || 'Anonymous', 
-        { 
-          type: effectiveType, 
-          url: finalUrl,
+        const id = await chatService.sendMessage(chatId, user.uid, getUserDisplayName(profile as UserProfile) || user.displayName || 'Anonymous', {
+          type: isMediaFile(it.file) ? 'image' : 'file',
+          url: 'p2p',
+          p2p: true,
+          fileName: it.file.name,
+          fileSize: it.file.size,
+          mimeType: it.file.type || 'application/octet-stream',
           thumbnail,
-          fileName: file.name, 
-          fileSize: file.size,
-          replyTo: replyingTo || undefined
-        }
-      );
-      setReplyingTo(null);
-    } catch (error: any) {
-      console.error('File upload failed:', error);
-      setUploadError(error?.message || 'Ошибка при отправке файла');
-      setTimeout(() => setUploadError(null), 5000);
-    } finally {
-      setIsUploading(false);
-      setUploadProgress(0);
-      setUploadMethod('');
-    }
-  };
-
-  const uploadFiles = async (files: File[]) => {
-    if (!files || files.length === 0 || !user) return;
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const isMedia = file.type.startsWith('image/') || file.type.startsWith('video/') || !!file.name.match(/\.(mp4|webm|mov|ogg)$/i);
-      const type = isMedia ? 'image' : 'file';
-      if (files.length > 1) {
-        setUploadMethod(`${i + 1}/${files.length} • ${file.name}`);
+          text: caption || undefined,
+          replyTo: i === 0 ? reply || undefined : undefined,
+        });
+        if (id) p2p.host.register(chatId, id, it.file);
+      } catch (err: any) {
+        setUploadError(`Не удалось отправить «${it.file.name}»: ${err?.message || 'ошибка'}`);
+        setTimeout(() => setUploadError(null), 6000);
       }
-      await uploadSelectedFile(file, type);
     }
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, _type: 'image' | 'file') => {
-    const target = e.target;
-    if (!target.files || target.files.length === 0) return;
-    const fileList = Array.from(target.files) as File[];
-    target.value = ''; // Safely reset input value AFTER copying the file list to an array!
-    await uploadFiles(fileList);
   };
 
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
@@ -469,7 +482,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
     }
     if (pastedFiles.length > 0) {
       e.preventDefault();
-      uploadFiles(pastedFiles);
+      addFiles(pastedFiles);
     }
   };
 
@@ -507,7 +520,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const droppedFiles = Array.from(e.dataTransfer.files) as File[];
-      await uploadFiles(droppedFiles);
+      addFiles(droppedFiles);
     }
   };
 
@@ -516,37 +529,33 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
     if (!recording || !user) return;
 
     try {
-      setIsUploading(true);
-      setUploadProgress(0);
       setUploadError(null);
-      
-      const fileName = `voice_${Date.now()}.webm`;
-      setUploadMethod('Голос');
-      const path = `chats/${chatId}/${fileName}`;
-      const finalUrl = await chatService.uploadFile(path, recording.blob, (progress) => {
-        setUploadProgress(Math.round(progress));
+      // Голосовое хранится прямо в сообщении, поэтому оно приходит сразу, даже если вы потом выйдете из сети
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('Не удалось прочитать запись'));
+        reader.readAsDataURL(recording.blob);
       });
+      if (dataUrl.length > 900_000) throw new Error('Голосовое сообщение слишком длинное. Максимум около 3 минут.');
 
       await chatService.sendMessage(
-        chatId, 
-        user.uid, 
-        getUserDisplayName(profile as UserProfile) || user.displayName || 'Anonymous', 
-        { 
-          type: 'voice', 
-          url: finalUrl, 
-          fileName,
+        chatId,
+        user.uid,
+        getUserDisplayName(profile as UserProfile) || user.displayName || 'Anonymous',
+        {
+          type: 'voice',
+          url: dataUrl,
+          fileName: `voice_${Date.now()}.webm`,
           duration: recording.duration,
-          replyTo: replyingTo || undefined
+          replyTo: replyingTo || undefined,
         }
       );
       setReplyingTo(null);
     } catch (error: any) {
-      console.error('Voice upload failed:', error);
+      console.error('Voice send failed:', error);
       setUploadError(error?.message || 'Ошибка при отправке голосового сообщения');
       setTimeout(() => setUploadError(null), 4000);
-    } finally {
-      setIsUploading(false);
-      setUploadProgress(0);
     }
   };
 
@@ -827,7 +836,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
 
       {/* Messages */}
       <div className={cn("chat-surface flex-1 min-w-0 overflow-y-auto overflow-x-hidden flex flex-col px-3 sm:px-4 pt-24 space-y-4 bg-[#fafafa] dark:bg-[#080808] custom-scrollbar", "pb-28")}
-            style={{ paddingBottom: 112 + ((replyingTo || editing) ? 64 : 0) + ((linkPreview.embed || linkPreview.loading) ? (linkPreview.embed?.image ? 168 : 112) : 0) }}>
+            style={{ paddingBottom: 112 + ((replyingTo || editing) ? 64 : 0) + ((linkPreview.embed || linkPreview.loading) && pending.length === 0 ? (linkPreview.embed?.image ? 168 : 112) : 0) + (pending.length > 0 ? 96 + Math.min(pending.length, 3) * 70 : 0) }}>
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-gray-300 dark:text-gray-700 gap-4">
             <div className="w-20 h-20 rounded-full bg-gray-50 dark:bg-[#111] flex items-center justify-center border border-gray-100 dark:border-[#222] shadow-inner">
@@ -913,16 +922,9 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
                     </button>
                   )}
                   {msg.type === 'voice' ? (
-                    <VoiceMessage url={msg.url === 'p2p-sent' ? p2pFiles[msg.fileName || ''] || 'p2p-sent' : msg.url!} duration={msg.duration} isMe={isMe} />
+                    <VoiceMessage url={msg.url!} duration={msg.duration} isMe={isMe} />
                   ) : msg.type === 'image' || msg.type === 'file' ? (
-                    msg.url === 'p2p-sent' && !p2pFiles[msg.fileName || ''] ? (
-                      <div className="flex items-center gap-2 p-2 text-sm italic opacity-80">
-                         <FileIcon className="w-4 h-4" />
-                         <span>{isMe ? 'Файл отправлен напрямую (P2P)' : 'Файл недоступен (прямая передача)'}</span>
-                      </div>
-                    ) : (
-                      <FileMessage type={msg.type} url={msg.url === 'p2p-sent' ? p2pFiles[msg.fileName || ''] : msg.url!} thumbnail={msg.thumbnail} fileName={msg.fileName} fileSize={msg.fileSize} isMe={isMe} />
-                    )
+                    <FileMessage message={msg} chatId={chatId} isMe={isMe} />
                   ) : (
                     <span className="whitespace-pre-wrap [overflow-wrap:anywhere]"><LinkifiedText text={msg.text || ''} /></span>
                   )}
@@ -979,30 +981,18 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
           </motion.div>
         )}
 
-        {isUploading && (
-          <div className="absolute bottom-full left-0 right-0 bg-white/90 dark:bg-[#0d0d0d]/90 backdrop-blur-sm px-4 py-2 border-t border-gray-100 dark:border-[#222] flex items-center justify-between shadow-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm text-gray-600 dark:text-gray-300 font-medium flex items-center gap-2">
-                Отправка... 
-                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-mono font-bold">
-                  {uploadMethod}
-                </span>
-              </span>
-            </div>
-            <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{uploadProgress}%</span>
-            <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gray-100 dark:bg-gray-800">
-              <motion.div 
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.max(uploadProgress, 5)}%` }}
-                transition={{ duration: 0.3 }}
-                className="h-full bg-blue-500"
-              />
-            </div>
-          </div>
+        {!isRecording && !editing && (
+          <PendingAttachments
+            items={pending}
+            onCaption={setCaption}
+            onRemove={removePending}
+            onAddMore={() => fileInputRef.current?.click()}
+            onClear={clearPending}
+            onSend={() => handleSend({ preventDefault() {} } as React.FormEvent)}
+          />
         )}
 
-        {(linkPreview.embed || linkPreview.loading) && !isRecording && !editing && (
+        {(linkPreview.embed || linkPreview.loading) && !isRecording && !editing && pending.length === 0 && (
           <div className="mb-2 flex justify-start">
             <LinkEmbedCard embed={linkPreview.embed} loading={linkPreview.loading} onDismiss={linkPreview.dismiss} className="embed-compose" />
           </div>
@@ -1108,70 +1098,26 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
               placeholder="Напишите сообщение..."
               className="flex-1 min-w-0 w-full bg-transparent border-none outline-none text-base sm:text-sm py-2 dark:text-white"
             />
-            <div className="relative flex items-center">
-              <button 
-                type="button" 
-                onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
-                className={cn(
-                  "p-2 rounded-full transition-colors",
-                  showAttachmentMenu ? "bg-gray-200 dark:bg-[#333] text-blue-500" : "hover:bg-gray-200 dark:hover:bg-[#222] text-gray-400"
-                )}
-              >
-                <Paperclip className="w-5 h-5" />
-              </button>
-              
-              <AnimatePresence>
-                {showAttachmentMenu && (
-                  <>
-                    <div className="fixed inset-0 z-30" onClick={() => setShowAttachmentMenu(false)} />
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                      transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                      className="absolute bottom-full mb-3 right-0 w-56 bg-gray-900 dark:bg-[#1a1a1a] rounded-2xl shadow-2xl border border-gray-800 dark:border-[#333] overflow-hidden z-40 origin-bottom-right"
-                    >
-                      <button 
-                        type="button"
-                        onClick={() => { imageInputRef.current?.click(); setShowAttachmentMenu(false); }}
-                        className="w-full text-left px-4 py-3 text-sm text-white flex items-center gap-3 hover:bg-gray-800 dark:hover:bg-[#222] transition-colors border-b border-gray-800 dark:border-[#222]"
-                      >
-                        <ImageIcon className="w-5 h-5 text-blue-400" />
-                        <span className="font-medium">Фото или видео</span>
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => { fileInputRef.current?.click(); setShowAttachmentMenu(false); }}
-                        className="w-full text-left px-4 py-3 text-sm text-white flex items-center gap-3 hover:bg-gray-800 dark:hover:bg-[#222] transition-colors"
-                      >
-                        <FileIcon className="w-5 h-5 text-purple-400" />
-                        <div className="flex flex-col">
-                           <span className="font-medium">Документ / Файл</span>
-                           <span className="text-[10px] text-gray-400">PDF, документы, архивы</span>
-                        </div>
-                      </button>
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
-            </div>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              title="Прикрепить файл"
+              aria-label="Прикрепить файл"
+              className={cn(
+                "p-2 rounded-full transition-colors shrink-0",
+                pending.length > 0 ? "text-blue-500 bg-blue-500/10" : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10"
+              )}
+            >
+              <Paperclip className="w-5 h-5" />
+            </button>
 
-            {input.trim() || isUploading ? (
+            {input.trim() || pending.length > 0 ? (
               <button 
                 type="submit" 
-                disabled={!input.trim() && !isUploading}
-                className={cn(
-                  "p-3 rounded-full transition-all shadow-md active:scale-95 flex items-center justify-center gap-1 min-w-[44px]",
-                  isUploading 
-                    ? "bg-gray-100 text-gray-500 cursor-not-allowed" 
-                    : "bg-[#1a1a1a] dark:bg-[#e5e5e0] text-white dark:text-black hover:bg-black dark:hover:bg-white disabled:opacity-50"
-                )}
+                disabled={!input.trim() && pending.length === 0}
+                className="p-3 rounded-full transition-all shadow-md active:scale-95 flex items-center justify-center gap-1 min-w-[44px] bg-[#1a1a1a] dark:bg-[#e5e5e0] text-white dark:text-black hover:bg-black dark:hover:bg-white disabled:opacity-50"
               >
-                {isUploading ? (
-                  <span className="text-xs font-bold font-mono">{uploadProgress}%</span>
-                ) : (
-                  <Send className="w-4 h-4" />
-                )}
+                <Send className="w-4 h-4" />
               </button>
             ) : (
               <button 
@@ -1198,22 +1144,8 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
         )}
       </AnimatePresence>
 
-      {/* Permanently mounted file inputs */}
-      <input 
-        type="file" 
-        ref={imageInputRef} 
-        onChange={(e) => handleFileUpload(e, 'image')} 
-        accept="image/*,video/*" 
-        multiple
-        className="hidden" 
-      />
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        onChange={(e) => handleFileUpload(e, 'file')} 
-        multiple
-        className="hidden" 
-      />
+      {/* Выбор файлов: любые типы, несколько сразу */}
+      <input type="file" ref={fileInputRef} onChange={handleFilePick} multiple className="hidden" />
     </div>
   );
 }

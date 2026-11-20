@@ -3,6 +3,7 @@ import { onAuthStateChanged, User, signInWithPopup, signOut } from 'firebase/aut
 import { auth, googleProvider, db } from '../lib/firebase';
 import { doc, setDoc, serverTimestamp, getDoc, onSnapshot } from 'firebase/firestore';
 import { UserProfile } from '../types';
+import { p2p } from '../services/p2pFirestore';
 
 interface AuthContextType {
   user: User | null;
@@ -184,6 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
+    p2p.host.stopAll(); // после выхода файлы больше никому не раздаются
     if (user) {
       const userRef = doc(db, 'users', user.uid);
       await setDoc(userRef, { status: 'offline', lastSeen: serverTimestamp() }, { merge: true });

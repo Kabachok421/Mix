@@ -31,7 +31,6 @@
     "files": [
       "electron/**/*",
       "web/**/*",
-      "config.default.json",
       "package.json"
     ],
     "win": {

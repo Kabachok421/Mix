@@ -71,105 +71,6 @@ export const chatService = {
     }, (error) => handleFirestoreError(error, 'list', `chats/${chatId}/messages`));
   },
   
-  // Upload file (via server endpoint /api/upload-raw or /api/upload)
-  uploadFile: async (_path: string, file: Blob | File, onProgress?: (progress: number) => void) => {
-    const filename = (file as File).name || (file.type.startsWith('audio/') ? `voice_${Date.now()}.webm` : 'file.bin');
-    const mimeType = file.type || 'application/octet-stream';
-
-    // Primary: direct binary stream upload via /api/upload-raw
-    try {
-      if (onProgress) onProgress(5);
-
-      return await new Promise<string>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', `/api/upload-raw?filename=${encodeURIComponent(filename)}&mimeType=${encodeURIComponent(mimeType)}`);
-        xhr.setRequestHeader('Content-Type', mimeType);
-
-        if (xhr.upload && onProgress) {
-          xhr.upload.onprogress = (e) => {
-            if (e.lengthComputable) {
-              const percent = Math.min(99, Math.round((e.loaded / e.total) * 100));
-              onProgress(percent);
-            }
-          };
-        }
-
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              const resJson = JSON.parse(xhr.responseText);
-              if (resJson?.url) {
-                if (onProgress) onProgress(100);
-                resolve(resJson.url);
-              } else {
-                reject(new Error('Некорректный ответ сервера'));
-              }
-            } catch {
-              reject(new Error('Ошибка парсинга ответа сервера'));
-            }
-          } else {
-            try {
-              const resJson = JSON.parse(xhr.responseText);
-              reject(new Error(resJson.error || `HTTP ${xhr.status}`));
-            } catch {
-              reject(new Error(`Ошибка сервера: HTTP ${xhr.status}`));
-            }
-          }
-        };
-
-        xhr.onerror = () => {
-          reject(new Error('Сетевая ошибка при загрузке файла'));
-        };
-
-        xhr.send(file);
-      });
-    } catch (primaryErr) {
-      console.warn('Stream upload failed, attempting fallback to base64 JSON upload:', primaryErr);
-      
-      // Secondary fallback: base64 upload
-      try {
-        const base64Data = await new Promise<string>((res, rej) => {
-          const reader = new FileReader();
-          reader.onload = () => res(reader.result as string);
-          reader.onerror = rej;
-          reader.readAsDataURL(file);
-        });
-
-        const resp = await fetch('/api/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filename, mimeType, fileData: base64Data })
-        });
-
-        if (resp.ok) {
-          const data = await resp.json();
-          if (data?.url) {
-            if (onProgress) onProgress(100);
-            return data.url;
-          }
-        }
-      } catch (fallbackErr) {
-        console.warn('Base64 upload also failed:', fallbackErr);
-      }
-
-      // Final fallback for small files (< 600 KB): return data URL directly so message is delivered
-      if (file.size < 600 * 1024) {
-        return new Promise<string>((res, rej) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            if (onProgress) onProgress(100);
-            res(reader.result as string);
-          };
-          reader.onerror = () => rej(primaryErr);
-          reader.readAsDataURL(file);
-        });
-      }
-
-      throw primaryErr;
-    }
-  },
-
-  // Send a message
   sendMessage: async (chatId: string, senderId: string, senderName: string, data: Partial<Message>) => {
     try {
       const messagesRef = collection(db, 'chats', chatId, 'messages');
@@ -192,6 +93,8 @@ export const chatService = {
       if (data.fileName) messageData.fileName = data.fileName;
       if (data.fileSize) messageData.fileSize = data.fileSize;
       if (data.duration) messageData.duration = data.duration;
+      if (data.mimeType) messageData.mimeType = String(data.mimeType).slice(0, 120);
+      if (data.p2p) messageData.p2p = true; // файл передаётся напрямую между устройствами, в сообщении только описание
       const embed = sanitizeEmbed(data.embed);
       if (embed) messageData.embed = embed;
       if (data.replyTo) {
@@ -204,7 +107,7 @@ export const chatService = {
         };
       }
 
-      await addDoc(messagesRef, messageData);
+      const messageRef = await addDoc(messagesRef, messageData);
 
       let lastMessageText = '';
       switch (messageData.type) {
@@ -224,6 +127,7 @@ export const chatService = {
       } catch (updateErr) {
         console.warn('Could not update chat lastMessage summary:', updateErr);
       }
+      return messageRef.id;
     } catch (error) {
       handleFirestoreError(error, 'create', `chats/${chatId}/messages`);
     }
