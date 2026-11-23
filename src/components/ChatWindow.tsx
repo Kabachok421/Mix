@@ -57,6 +57,11 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
   const [editing, setEditing] = useState<{ id: string; original: string } | null>(null);
   // Выбранные файлы: сначала лежат над полем ввода, отправляются кнопкой, к каждому можно добавить подпись
   const [pending, setPending] = useState<PendingFile[]>([]);
+  // Сколько последних сообщений показано. По кнопке «Показать более ранние сообщения» растёт на 100; при смене чата сбрасывается.
+  const PAGE_SIZE = 100;
+  const [limitState, setLimitState] = useState({ chatId, n: PAGE_SIZE });
+  const messageLimit = limitState.chatId === chatId ? limitState.n : PAGE_SIZE;
+  const skipScrollRef = useRef(false); // при подгрузке старых сообщений не прокручиваем чат вниз
   // Вложение для первой ссылки в вводимом тексте (до отправки его можно открепить)
   const linkPreview = useLinkPreview(input, !editing);
 
@@ -115,7 +120,7 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
     const unsubscribeMessages = chatService.subscribeToMessages(chatId, (newMessages) => {
       setMessages(newMessages);
       chatService.markMessagesAsRead(chatId, user.uid, newMessages);
-    });
+    }, messageLimit);
 
     const memberUnsubs: Record<string, () => void> = {};
 
@@ -163,9 +168,13 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
         chatService.setTypingStatus(chatId, user.uid, false);
       }
     };
-  }, [chatId, user]);
+  }, [chatId, user, messageLimit]);
 
   useEffect(() => {
+    if (skipScrollRef.current) {
+      skipScrollRef.current = false;
+      return;
+    }
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
@@ -837,6 +846,19 @@ export default function ChatWindow({ chatId, onClose }: ChatWindowProps) {
       {/* Messages */}
       <div className={cn("chat-surface flex-1 min-w-0 overflow-y-auto overflow-x-hidden flex flex-col px-3 sm:px-4 pt-24 space-y-4 bg-[#fafafa] dark:bg-[#080808] custom-scrollbar", "pb-28")}
             style={{ paddingBottom: 112 + ((replyingTo || editing) ? 64 : 0) + ((linkPreview.embed || linkPreview.loading) && pending.length === 0 ? (linkPreview.embed?.image ? 168 : 112) : 0) + (pending.length > 0 ? 96 + Math.min(pending.length, 3) * 70 : 0) }}>
+        {messages.length >= messageLimit && (
+          <button
+            type="button"
+            onClick={() => {
+              skipScrollRef.current = true;
+              setLimitState({ chatId, n: messageLimit + PAGE_SIZE });
+            }}
+            className="self-center shrink-0 px-4 py-1.5 rounded-full text-xs font-medium bg-black/5 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-black/10 dark:hover:bg-white/15 transition-colors"
+          >
+            Показать более ранние сообщения
+          </button>
+        )}
+
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-gray-300 dark:text-gray-700 gap-4">
             <div className="w-20 h-20 rounded-full bg-gray-50 dark:bg-[#111] flex items-center justify-center border border-gray-100 dark:border-[#222] shadow-inner">

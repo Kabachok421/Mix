@@ -55,18 +55,20 @@ export const chatService = {
   },
 
   // Get messages for a chat
-  subscribeToMessages: (chatId: string, callback: (messages: Message[]) => void) => {
+  // Последние `count` сообщений чата в порядке от старых к новым.
+  // Раньше запрос брал ПЕРВЫЕ 100 сообщений переписки, и когда их становилось больше, новые переставали появляться в окне чата.
+  subscribeToMessages: (chatId: string, callback: (messages: Message[]) => void, count: number = 100) => {
     const q = query(
       collection(db, 'chats', chatId, 'messages'),
-      orderBy('timestamp', 'asc'),
-      limit(100)
+      orderBy('timestamp', 'desc'),
+      limit(count)
     );
 
     return onSnapshot(q, (snapshot) => {
       const messages = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      } as Message));
+      } as Message)).reverse();
       callback(messages);
     }, (error) => handleFirestoreError(error, 'list', `chats/${chatId}/messages`));
   },
